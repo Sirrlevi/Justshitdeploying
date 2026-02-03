@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presence</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --text-silver: #d1d1d1;
+            --text-dark: #333;
+            --accent: #fff;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: var(--bg);
+            color: var(--text-silver);
+            font-family: 'Times New Roman', serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            overflow: hidden;
+            /* Heavy Grain Texture */
+            background-image: url('https://www.transparenttextures.com/patterns/asfalt-dark.png');
+        }
+
+        /* Cinema Vignette (Edges dark) */
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.9) 100%);
+            pointer-events: none;
+        }
+
+        /* Top Header */
+        header {
+            margin-top: 4rem;
+            z-index: 10;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            opacity: 0.6;
+            animation: flicker 4s infinite;
+        }
+
+        /* Middle Statement */
+        .hero {
+            text-align: center;
+            z-index: 10;
+        }
+
+        .hero h1 {
+            font-size: 4.5rem;
+            font-weight: 400;
+            margin: 0;
+            letter-spacing: -3px;
+            color: var(--accent);
+            animation: smoke-pulse 6s infinite ease-in-out;
+        }
+
+        .hero p {
+            font-size: 1.5rem;
+            color: #666;
+            margin-top: 0;
+            font-style: italic;
+        }
+
+        /* Footer Ticker */
+        footer {
+            margin-bottom: 5rem;
+            z-index: 10;
+            height: 30px;
+        }
+
+        #ticker {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--text-dark);
+            transition: all 1s ease-in-out;
+        }
+
+        /* Animations */
+        @keyframes smoke-pulse {
+            0% { filter: blur(0px); opacity: 1; transform: scale(1); }
+            50% { filter: blur(3px); opacity: 0.7; transform: scale(1.01); }
+            100% { filter: blur(0px); opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 0.4; }
+            52% { opacity: 0.8; }
+            54% { opacity: 0.3; }
+        }
+
+        .blur-out { opacity: 0; filter: blur(12px); transform: translateY(5px); }
+        .blur-in { opacity: 1; filter: blur(0px); transform: translateY(0px); }
+
+    </style>
+</head>
+<body>
+
+    <header>Nothing is coming to save you.</header>
+
+    <div class="hero">
+        <h1>Faith matters.</h1>
+        <p>Just not in gods.</p>
+    </div>
+
+    <footer>
+        <span id="ticker">...</span>
+    </footer>
+
+    <script>
+        const statements = [
+            "nothing sacred here", "no god exists", "no one likes you", "cigarette better", 
+            "smoking is peace", "fuck religions", "don't trust anyone", "meaning is a choice", 
+            "everything burns", "alone is fine", "cold reality", "stay awake", 
+            "no heaven to find", "responsibility is heavy", "dust to dust", "no masters", 
+            "silence is enough", "void is home", "fake depth kills", "truth is ugly", 
+            "breathe the smoke", "human, nothing more", "reject the comfort", "it's all chemical", "presence."
+        ];
+
+        let i = 0;
+        const ticker = document.getElementById('ticker');
+
+        function updateTicker() {
+            ticker.classList.add('blur-out');
+            
+            setTimeout(() => {
+                ticker.textContent = statements[i];
+                ticker.classList.remove('blur-out');
+                ticker.classList.add('blur-in');
+                i = (i + 1) % statements.length;
+            }, 1000);
+        }
+
+        setInterval(updateTicker, 4000);
+        updateTicker();
+    </script>
+</body>
+</html>
