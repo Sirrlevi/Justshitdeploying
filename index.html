@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Page title changed to "just for fun" -->
     <title>just for fun</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -131,9 +130,19 @@
             position: relative;
             width: 280px;
             height: 280px;
-            cursor: pointer;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
+        }
+
+        /* Vinyl click area */
+        .vinyl-click-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 2;
         }
 
         /* Realistic vinyl shadow - lifted effect */
@@ -230,8 +239,8 @@
             right: -40px;
             width: 160px;
             height: 220px;
-            pointer-events: none;
             z-index: 10;
+            cursor: pointer;
         }
 
         /* Tonearm base/pivot */
@@ -443,9 +452,9 @@
             font-size: 0.8rem;
             font-weight: 300;
             letter-spacing: 0.18em;
-            color: var(--text-primary); /* Changed from var(--text-muted) */
+            color: var(--text-primary);
             text-transform: lowercase;
-            opacity: 0.95; /* Increased from 0.85 */
+            opacity: 0.95;
             margin-top: 2rem;
             text-shadow: 0 0 12px rgba(201, 168, 108, 0.4);
         }
@@ -475,21 +484,22 @@
             opacity: 0.8;
         }
 
-        /* Guidance text */
+        /* Guidance text - IMPROVED VISIBILITY AND POSITION */
         .guidance {
             position: absolute;
-            bottom: -60px;
+            bottom: -50px; /* Moved up from -60px */
             left: 50%;
             transform: translateX(-50%);
             font-size: 0.7rem;
             font-weight: 300;
             letter-spacing: 0.1em;
-            color: var(--text-muted);
+            color: var(--text-highlight); /* Changed from muted to highlight */
             text-align: center;
-            opacity: 0.8;
+            opacity: 0.9; /* Increased from 0.8 */
             transition: opacity 0.5s ease;
             white-space: nowrap;
             z-index: 5;
+            text-shadow: 0 0 8px rgba(201, 168, 108, 0.4);
         }
 
         .guidance.hidden {
@@ -537,6 +547,10 @@
             .divider {
                 margin-bottom: 2rem;
             }
+            
+            .guidance {
+                bottom: -45px;
+            }
         }
 
         @media (max-height: 550px) {
@@ -556,6 +570,11 @@
                 font-size: 1rem;
                 margin-bottom: 1.5rem;
             }
+            
+            .guidance {
+                bottom: -40px;
+                font-size: 0.65rem;
+            }
         }
     </style>
 </head>
@@ -574,7 +593,7 @@
     <div class="container">
         <!-- Vinyl section -->
         <div class="vinyl-section">
-            <div class="vinyl-wrapper" id="vinyl" role="button" aria-label="Play or pause music">
+            <div class="vinyl-wrapper">
                 <!-- Realistic shadow -->
                 <div class="vinyl-shadow"></div>
 
@@ -584,8 +603,11 @@
                     <div class="vinyl-shine"></div>
                 </div>
 
-                <!-- Detailed tonearm assembly -->
-                <div class="tonearm-assembly">
+                <!-- Vinyl click area (for play/pause) -->
+                <div class="vinyl-click-area" id="vinylClick"></div>
+
+                <!-- Detailed tonearm assembly (for next track) -->
+                <div class="tonearm-assembly" id="tonearmClick">
                     <div class="tonearm-base"></div>
                     <div class="tonearm" id="tonearm">
                         <div class="tonearm-head"></div>
@@ -631,7 +653,8 @@
         ];
 
         // DOM elements
-        const vinyl = document.getElementById('vinyl');
+        const vinylClick = document.getElementById('vinylClick');
+        const tonearmClick = document.getElementById('tonearmClick');
         const vinylContainer = document.getElementById('vinylContainer');
         const tonearm = document.getElementById('tonearm');
         const audioPlayer = document.getElementById('audioPlayer');
@@ -709,7 +732,7 @@
             });
         }
 
-        // Toggle play/pause or next track if already playing
+        // Toggle play/pause
         function togglePlayback() {
             // Hide guidance on first tap
             if (isFirstTap) {
@@ -718,10 +741,8 @@
             }
 
             if (isPlaying) {
-                // If already playing, play next track
-                playNextTrack();
+                pauseMusic();
             } else {
-                // If not playing, play current track
                 playMusic();
             }
         }
@@ -747,11 +768,30 @@
             nowPlaying.classList.remove('visible');
         }
 
+        // Next track function
+        function nextTrack() {
+            // Hide guidance on first tap
+            if (isFirstTap) {
+                guidance.classList.add('hidden');
+                isFirstTap = false;
+            }
+            
+            playNextTrack();
+        }
+
         // Event listeners
-        vinyl.addEventListener('click', togglePlayback);
-        vinyl.addEventListener('touchstart', (e) => {
+        vinylClick.addEventListener('click', togglePlayback);
+        tonearmClick.addEventListener('click', nextTrack);
+        
+        // Touch events for mobile
+        vinylClick.addEventListener('touchstart', (e) => {
             e.preventDefault();
             togglePlayback();
+        }, { passive: false });
+        
+        tonearmClick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            nextTrack();
         }, { passive: false });
 
         // Handle audio ended
@@ -760,6 +800,11 @@
             vinylContainer.classList.remove('spinning');
             tonearm.classList.remove('playing');
             nowPlaying.classList.remove('visible');
+            
+            // Auto-play next track when current ends
+            setTimeout(() => {
+                playNextTrack();
+            }, 1000);
         });
 
         // Handle audio error (file not found)
