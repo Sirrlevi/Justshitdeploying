@@ -367,9 +367,9 @@
             opacity: 0.95;
         }
 
-        /* Divider line with glow */
+        /* Divider line with glow - UPDATED WIDTH: 80px to 120px */
         .divider {
-            width: 80px;
+            width: 120px;
             height: 1px;
             background: linear-gradient(
                 90deg,
@@ -437,14 +437,14 @@
             width: 120%;
         }
 
-        /* Footer with subtle glow */
+        /* Footer with subtle glow - UPDATED OPACITY: 0.7 to 0.85 */
         .footer {
             font-size: 0.8rem;
             font-weight: 300;
             letter-spacing: 0.18em;
             color: var(--text-muted);
             text-transform: lowercase;
-            opacity: 0.7;
+            opacity: 0.85;
             margin-top: 2rem;
             text-shadow: 0 0 10px rgba(107, 90, 66, 0.2);
         }
@@ -672,12 +672,7 @@
                 nowPlaying.classList.add('visible');
             }).catch(error => {
                 console.log('Playback failed:', error);
-                // Show message if no song file found
-                nowPlaying.textContent = 'add mp3 files to songs folder';
-                nowPlaying.classList.add('visible');
-                setTimeout(() => {
-                    nowPlaying.classList.remove('visible');
-                }, 3000);
+                // Error message removed as requested
             });
         }
 
@@ -708,11 +703,7 @@
         // Handle audio error (file not found)
         audioPlayer.addEventListener('error', () => {
             console.log('Audio file not found');
-            nowPlaying.textContent = 'add mp3 files to songs folder';
-            nowPlaying.classList.add('visible');
-            setTimeout(() => {
-                nowPlaying.classList.remove('visible');
-            }, 3000);
+            // Error message removed as requested
         });
 
         // Initialize
