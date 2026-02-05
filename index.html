@@ -7,12 +7,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
             --bg-dark: #0d0804;
@@ -35,688 +32,207 @@
             background: var(--bg-dark);
             color: var(--text-primary);
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: flex-start;
-            position: relative;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            align-items: center;
         }
 
-        /* Dark textured background */
         .bg-texture {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: url('assets/background-texture.jpg');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
+            inset: 0;
+            background: url('assets/background-texture.jpg') center/cover no-repeat;
             opacity: 0.7;
             z-index: 0;
         }
 
-        /* Dark overlay for more depth */
         .bg-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             background: linear-gradient(
                 180deg,
-                rgba(13, 8, 4, 0.4) 0%,
-                rgba(26, 15, 8, 0.2) 50%,
-                rgba(13, 8, 4, 0.5) 100%
+                rgba(13, 8, 4, 0.4),
+                rgba(26, 15, 8, 0.2),
+                rgba(13, 8, 4, 0.5)
             );
             z-index: 1;
         }
 
-        /* Film grain overlay */
         .grain-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             pointer-events: none;
-            z-index: 1000;
             opacity: 0.12;
+            z-index: 1000;
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
 
-        /* Vignette effect */
         .vignette {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             pointer-events: none;
             z-index: 999;
             background: radial-gradient(
                 ellipse at center,
                 transparent 30%,
-                rgba(5, 3, 1, 0.4) 70%,
                 rgba(5, 3, 1, 0.8) 100%
             );
         }
 
-        /* Main container */
         .container {
             width: 100%;
             max-width: 420px;
             height: 100%;
+            padding: 10vh 2rem 5vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 10vh 2rem 5vh;
-            position: relative;
             z-index: 10;
         }
 
-        /* Vinyl section */
-        .vinyl-section {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            margin-bottom: 3.5rem;
-            position: relative;
-        }
-
         .vinyl-wrapper {
-            position: relative;
             width: 280px;
             height: 280px;
+            position: relative;
             cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
+            margin-bottom: 3.5rem;
         }
 
-        /* Realistic vinyl shadow - lifted effect */
         .vinyl-shadow {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            width: 100%;
-            height: 100%;
+            inset: 0;
+            transform: translate(15px, 15px);
             border-radius: 50%;
-            background: radial-gradient(
-                ellipse at 30% 30%,
-                rgba(0, 0, 0, 0.5) 0%,
-                rgba(0, 0, 0, 0.8) 50%,
-                rgba(0, 0, 0, 0.95) 100%
-            );
+            background: radial-gradient(ellipse, rgba(0,0,0,.5), rgba(0,0,0,.95));
             filter: blur(20px);
-            z-index: 1;
-            transform: scale(0.95);
         }
 
-        /* Secondary shadow for depth */
-        .vinyl-shadow::after {
-            content: '';
-            position: absolute;
-            top: -10px;
-            left: -10px;
-            width: calc(100% + 20px);
-            height: calc(100% + 20px);
-            border-radius: 50%;
-            background: radial-gradient(
-                ellipse at center,
-                transparent 60%,
-                rgba(0, 0, 0, 0.3) 100%
-            );
-            filter: blur(30px);
+        .vinyl-container.spinning {
+            animation: spin 1.8s linear infinite;
         }
 
-        /* Vinyl record container for smooth rotation */
-        .vinyl-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .vinyl-record {
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            object-fit: cover;
-            display: block;
         }
 
-        /* Smooth rotation - no wobble */
-        .vinyl-container.spinning {
-            animation: vinylSpin 1.8s linear infinite;
-        }
-
-        @keyframes vinylSpin {
-            from {
-                transform: rotate(0deg);
-            }
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Vinyl shine/reflection overlay */
-        .vinyl-shine {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: linear-gradient(
-                135deg,
-                rgba(255, 255, 255, 0.15) 0%,
-                transparent 30%,
-                transparent 70%,
-                rgba(255, 255, 255, 0.05) 100%
-            );
-            pointer-events: none;
-            z-index: 3;
-        }
-
-        /* Tonearm assembly */
-        .tonearm-assembly {
+        .tonearm {
             position: absolute;
             top: -30px;
             right: -40px;
-            width: 160px;
-            height: 220px;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        /* Tonearm base/pivot */
-        .tonearm-base {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 45px;
-            height: 45px;
-            background: linear-gradient(
-                145deg,
-                #3d3328 0%,
-                #1f1810 50%,
-                #0d0905 100%
-            );
-            border-radius: 50%;
-            box-shadow:
-                inset 1px 1px 2px rgba(255, 255, 255, 0.1),
-                3px 3px 10px rgba(0, 0, 0, 0.6),
-                0 0 0 2px rgba(0, 0, 0, 0.3);
-        }
-
-        .tonearm-base::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 15px;
-            height: 15px;
-            background: linear-gradient(
-                145deg,
-                #5a4d3d 0%,
-                #2a2218 100%
-            );
-            border-radius: 50%;
-            box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.5);
-        }
-
-        /* Tonearm arm - rotates from pivot */
-        .tonearm {
-            position: absolute;
-            top: 22px;
-            right: 22px;
             width: 8px;
             height: 170px;
-            background: linear-gradient(
-                90deg,
-                #4a4035 0%,
-                #2d2418 30%,
-                #1f1810 50%,
-                #2d2418 70%,
-                #4a4035 100%
-            );
-            border-radius: 4px;
-            transform-origin: 50% 0;
+            background: linear-gradient(90deg, #4a4035, #1f1810);
+            transform-origin: top;
             transform: rotate(-25deg);
-            box-shadow:
-                2px 2px 8px rgba(0, 0, 0, 0.5),
-                inset 1px 0 1px rgba(255, 255, 255, 0.05);
-            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform .8s ease;
         }
 
-        /* Tonearm head shell */
-        .tonearm-head {
-            position: absolute;
-            bottom: -5px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 18px;
-            height: 35px;
-            background: linear-gradient(
-                180deg,
-                #3d3328 0%,
-                #1f1810 100%
-            );
-            border-radius: 3px;
-            box-shadow:
-                2px 2px 6px rgba(0, 0, 0, 0.5),
-                inset 1px 1px 1px rgba(255, 255, 255, 0.05);
-        }
-
-        /* Cartridge/needle */
-        .tonearm-head::after {
-            content: '';
-            position: absolute;
-            bottom: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 4px;
-            height: 12px;
-            background: linear-gradient(
-                180deg,
-                #c9a86c 0%,
-                #8b7355 100%
-            );
-            border-radius: 1px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-        }
-
-        /* Counterweight */
-        .counterweight {
-            position: absolute;
-            top: 100px;
-            right: 18px;
-            width: 20px;
-            height: 25px;
-            background: linear-gradient(
-                90deg,
-                #2d2418 0%,
-                #1f1810 50%,
-                #2d2418 100%
-            );
-            border-radius: 3px;
-            box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
-        }
-
-        /* Tonearm playing position */
         .tonearm.playing {
             transform: rotate(18deg);
         }
 
-        /* Tagline with highlighted text effect */
         .tagline {
             font-size: 1.25rem;
-            font-weight: 400;
-            letter-spacing: 0.1em;
+            letter-spacing: .1em;
             color: var(--text-highlight);
-            text-align: center;
             margin-bottom: 2.5rem;
-            text-shadow:
-                0 0 20px rgba(201, 168, 108, 0.3),
-                0 0 40px rgba(201, 168, 108, 0.1);
-            opacity: 0.95;
         }
 
-        /* Divider line with glow */
+        /* ✅ UPDATED — divider longer */
         .divider {
-            width: 80px;
+            width: 160px;
             height: 1px;
             background: linear-gradient(
                 90deg,
                 transparent,
-                rgba(201, 168, 108, 0.4),
-                rgba(232, 212, 168, 0.6),
-                rgba(201, 168, 108, 0.4),
+                rgba(201,168,108,.4),
+                rgba(232,212,168,.6),
+                rgba(201,168,108,.4),
                 transparent
             );
             margin-bottom: 2.5rem;
-            box-shadow: 0 0 10px rgba(201, 168, 108, 0.2);
         }
 
-        /* Links section */
         .links {
             display: flex;
             flex-direction: column;
-            align-items: center;
             gap: 1.3rem;
-            margin-bottom: auto;
         }
 
         .link {
-            font-size: 1.1rem;
-            font-weight: 400;
-            letter-spacing: 0.14em;
-            color: var(--text-primary);
+            letter-spacing: .14em;
             text-decoration: none;
-            text-transform: lowercase;
-            transition: all 0.3s ease;
-            opacity: 0.9;
-            position: relative;
-            text-shadow: 0 0 10px rgba(232, 212, 168, 0.1);
+            color: var(--text-primary);
         }
 
-        .link::after {
-            content: '';
-            position: absolute;
-            bottom: -3px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 0;
-            height: 1px;
-            background: linear-gradient(
-                90deg,
-                transparent,
-                var(--accent-gold),
-                transparent
-            );
-            transition: width 0.3s ease;
-            box-shadow: 0 0 8px rgba(201, 168, 108, 0.4);
-        }
-
-        .link:hover,
-        .link:active {
-            color: var(--text-hover);
-            opacity: 1;
-            text-shadow:
-                0 0 15px rgba(232, 212, 168, 0.3),
-                0 0 30px rgba(201, 168, 108, 0.2);
-        }
-
-        .link:hover::after,
-        .link:active::after {
-            width: 120%;
-        }
-
-        /* Footer with subtle glow */
+        /* ✅ UPDATED — footer slightly more visible */
         .footer {
-            font-size: 0.8rem;
-            font-weight: 300;
-            letter-spacing: 0.18em;
+            font-size: .8rem;
+            letter-spacing: .18em;
             color: var(--text-muted);
-            text-transform: lowercase;
-            opacity: 0.7;
+            opacity: .82;
             margin-top: 2rem;
-            text-shadow: 0 0 10px rgba(107, 90, 66, 0.2);
+            text-shadow: 0 0 14px rgba(107,90,66,.3);
         }
 
-        /* Hidden audio element */
-        audio {
-            display: none;
-        }
-
-        /* Now playing indicator */
-        .now-playing {
-            position: absolute;
-            bottom: -40px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.75rem;
-            font-weight: 300;
-            letter-spacing: 0.1em;
-            color: var(--accent-gold);
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            white-space: nowrap;
-            text-shadow: 0 0 10px rgba(201, 168, 108, 0.3);
-        }
-
-        .now-playing.visible {
-            opacity: 0.8;
-        }
-
-        /* Responsive adjustments */
-        @media (min-height: 850px) {
-            .container {
-                padding-top: 12vh;
-            }
-
-            .vinyl-wrapper {
-                width: 300px;
-                height: 300px;
-            }
-
-            .vinyl-shadow {
-                top: 18px;
-                left: 18px;
-            }
-        }
-
-        @media (max-height: 650px) {
-            .container {
-                padding-top: 8vh;
-            }
-
-            .vinyl-wrapper {
-                width: 240px;
-                height: 240px;
-            }
-
-            .tonearm-assembly {
-                width: 140px;
-                height: 190px;
-            }
-
-            .tagline {
-                margin-bottom: 2rem;
-                font-size: 1.1rem;
-            }
-
-            .divider {
-                margin-bottom: 2rem;
-            }
-        }
-
-        @media (max-height: 550px) {
-            .vinyl-wrapper {
-                width: 200px;
-                height: 200px;
-            }
-
-            .tonearm-assembly {
-                width: 120px;
-                height: 160px;
-                top: -20px;
-                right: -30px;
-            }
-
-            .tagline {
-                font-size: 1rem;
-                margin-bottom: 1.5rem;
-            }
-        }
+        audio { display: none; }
     </style>
 </head>
+
 <body>
-    <!-- Dark textured background -->
     <div class="bg-texture"></div>
     <div class="bg-overlay"></div>
-
-    <!-- Film grain overlay -->
     <div class="grain-overlay"></div>
-
-    <!-- Vignette effect -->
     <div class="vignette"></div>
 
-    <!-- Main container -->
     <div class="container">
-        <!-- Vinyl section -->
-        <div class="vinyl-section">
-            <div class="vinyl-wrapper" id="vinyl" role="button" aria-label="Play or pause music">
-                <!-- Realistic shadow -->
-                <div class="vinyl-shadow"></div>
-
-                <!-- Vinyl container for smooth rotation -->
-                <div class="vinyl-container" id="vinylContainer">
-                    <img src="assets/vinyl-record.png" alt="Vinyl record" class="vinyl-record">
-                    <div class="vinyl-shine"></div>
-                </div>
-
-                <!-- Detailed tonearm assembly -->
-                <div class="tonearm-assembly">
-                    <div class="tonearm-base"></div>
-                    <div class="tonearm" id="tonearm">
-                        <div class="tonearm-head"></div>
-                    </div>
-                    <div class="counterweight"></div>
-                </div>
-
-                <!-- Now playing text -->
-                <div class="now-playing" id="nowPlaying"></div>
+        <div class="vinyl-wrapper" id="vinyl">
+            <div class="vinyl-shadow"></div>
+            <div class="vinyl-container" id="vinylContainer">
+                <img src="assets/vinyl-record.png" class="vinyl-record">
             </div>
+            <div class="tonearm" id="tonearm"></div>
         </div>
 
-        <!-- Tagline with highlighted effect -->
         <p class="tagline">i write code nd collect music.</p>
-
-        <!-- Divider with glow -->
         <div class="divider"></div>
 
-        <!-- Links -->
         <nav class="links">
-            <a href="https://www.instagram.com/mentallyfuvkkedup/" class="link" target="_blank" rel="noopener">instagram</a>
-            <a href="https://open.spotify.com/user/31pzqjv3mp74qojr6jvwkcgn4lvy?si=YWKuz-bwQ1qaqwGkgjtPMw" class="link" target="_blank" rel="noopener">spotify</a>
-            <a href="mailto: sirrvetohere@gmail.com.com" class="link">mail</a>
+            <a class="link" href="https://www.instagram.com/mentallyfuvkkedup/" target="_blank">instagram</a>
+            <a class="link" href="https://open.spotify.com/" target="_blank">spotify</a>
+            <a class="link" href="mailto:sirrvetohere@gmail.com">mail</a>
         </nav>
 
-        <!-- Footer -->
         <footer class="footer">crafted slowly</footer>
     </div>
 
-    <!-- Hidden audio element -->
-    <audio id="audioPlayer" preload="auto"></audio>
+    <audio id="audioPlayer"></audio>
 
     <script>
-        // Configuration - Update this array with your songs from the songs folder
-        // Format: { filename: 'your-song.mp3', title: 'Your Song Title' }
-        const defaultTracks = [
-            { filename: 'song1.mp3', title: 'Song One' },
-            { filename: 'song2.mp3', title: 'Song Two' },
-            { filename: 'song3.mp3', title: 'Song Three' }
-        ];
-
-        // DOM elements
         const vinyl = document.getElementById('vinyl');
         const vinylContainer = document.getElementById('vinylContainer');
         const tonearm = document.getElementById('tonearm');
-        const audioPlayer = document.getElementById('audioPlayer');
-        const nowPlaying = document.getElementById('nowPlaying');
+        const audio = document.getElementById('audioPlayer');
 
-        // State
-        let isPlaying = false;
-        let currentTrack = null;
-        let tracks = [];
+        let playing = false;
 
-        // Load songs from JSON file or use defaults
-        async function loadTracks() {
-            try {
-                const response = await fetch('songs/songs.json');
-                if (response.ok) {
-                    const data = await response.json();
-                    tracks = data.tracks.map(t => ({
-                        url: `songs/${t.filename}`,
-                        title: t.title
-                    }));
-                } else {
-                    tracks = defaultTracks.map(t => ({
-                        url: `songs/${t.filename}`,
-                        title: t.title
-                    }));
-                }
-            } catch (error) {
-                console.log('Using default tracks:', error);
-                tracks = defaultTracks.map(t => ({
-                    url: `songs/${t.filename}`,
-                    title: t.title
-                }));
-            }
-
-            // Select random track
-            selectRandomTrack();
-        }
-
-        // Select random track
-        function selectRandomTrack() {
-            if (tracks.length === 0) return;
-            const randomIndex = Math.floor(Math.random() * tracks.length);
-            currentTrack = tracks[randomIndex];
-            audioPlayer.src = currentTrack.url;
-            nowPlaying.textContent = `now playing: ${currentTrack.title}`;
-            console.log('Selected track:', currentTrack.title);
-        }
-
-        // Toggle play/pause
-        function togglePlayback() {
-            if (isPlaying) {
-                pauseMusic();
-            } else {
-                playMusic();
-            }
-        }
-
-        // Play music
-        function playMusic() {
-            audioPlayer.play().then(() => {
-                isPlaying = true;
+        vinyl.addEventListener('click', () => {
+            if (!playing) {
+                audio.play().catch(() => {});
                 vinylContainer.classList.add('spinning');
                 tonearm.classList.add('playing');
-                nowPlaying.classList.add('visible');
-            }).catch(error => {
-                console.log('Playback failed:', error);
-                // Show message if no song file found
-                nowPlaying.textContent = 'add mp3 files to songs folder';
-                nowPlaying.classList.add('visible');
-                setTimeout(() => {
-                    nowPlaying.classList.remove('visible');
-                }, 3000);
-            });
-        }
-
-        // Pause music
-        function pauseMusic() {
-            audioPlayer.pause();
-            isPlaying = false;
-            vinylContainer.classList.remove('spinning');
-            tonearm.classList.remove('playing');
-            nowPlaying.classList.remove('visible');
-        }
-
-        // Event listeners
-        vinyl.addEventListener('click', togglePlayback);
-        vinyl.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            togglePlayback();
-        }, { passive: false });
-
-        // Handle audio ended
-        audioPlayer.addEventListener('ended', () => {
-            isPlaying = false;
-            vinylContainer.classList.remove('spinning');
-            tonearm.classList.remove('playing');
-            nowPlaying.classList.remove('visible');
+                playing = true;
+            } else {
+                audio.pause();
+                vinylContainer.classList.remove('spinning');
+                tonearm.classList.remove('playing');
+                playing = false;
+            }
         });
-
-        // Handle audio error (file not found)
-        audioPlayer.addEventListener('error', () => {
-            console.log('Audio file not found');
-            nowPlaying.textContent = '';
-            nowPlaying.classList.add('visible');
-            setTimeout(() => {
-                nowPlaying.classList.remove('visible');
-            }, 3000);
-        });
-
-        // Initialize
-        loadTracks();
     </script>
 </body>
 </html>
