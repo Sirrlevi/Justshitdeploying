@@ -437,16 +437,16 @@
             width: 120%;
         }
 
-        /* Footer with subtle glow - UPDATED OPACITY: 0.7 to 0.85 */
+        /* Footer with subtle glow - UPDATED OPACITY AND COLOR */
         .footer {
             font-size: 0.8rem;
             font-weight: 300;
             letter-spacing: 0.18em;
-            color: var(--text-muted);
+            color: var(--text-primary); /* Changed from var(--text-muted) */
             text-transform: lowercase;
-            opacity: 0.85;
+            opacity: 0.95; /* Increased from 0.85 */
             margin-top: 2rem;
-            text-shadow: 0 0 10px rgba(107, 90, 66, 0.2);
+            text-shadow: 0 0 12px rgba(201, 168, 108, 0.4);
         }
 
         /* Hidden audio element */
@@ -472,6 +472,28 @@
 
         .now-playing.visible {
             opacity: 0.8;
+        }
+
+        /* Guidance text */
+        .guidance {
+            position: absolute;
+            bottom: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            font-weight: 300;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            text-align: center;
+            opacity: 0.8;
+            transition: opacity 0.5s ease;
+            white-space: nowrap;
+            z-index: 5;
+        }
+
+        .guidance.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
 
         /* Responsive adjustments */
@@ -570,22 +592,25 @@
                     <div class="counterweight"></div>
                 </div>
 
+                <!-- Guidance text -->
+                <div class="guidance" id="guidance">tap vinyl to play</div>
+
                 <!-- Now playing text -->
                 <div class="now-playing" id="nowPlaying"></div>
             </div>
         </div>
 
         <!-- Tagline with highlighted effect -->
-        <p class="tagline">i write code nd collect music.</p>
+        <p class="tagline">i write code, i collect sound.</p>
 
         <!-- Divider with glow -->
         <div class="divider"></div>
 
         <!-- Links -->
         <nav class="links">
-            <a href="https://www.instagram.com/mentallyfuvkkedup/" class="link" target="_blank" rel="noopener">instagram</a>
-            <a href="https://open.spotify.com/user/31pzqjv3mp74qojr6jvwkcgn4lvy?si=1BXcehAPRiOA9XqIP-Pvug" class="link" target="_blank" rel="noopener">spotify</a>
-            <a href="mailto:sirrvetohere@gmail.com.com" class="link">mail</a>
+            <a href="https://github.com" class="link" target="_blank" rel="noopener">github</a>
+            <a href="https://spotify.com" class="link" target="_blank" rel="noopener">spotify</a>
+            <a href="mailto:hello@example.com" class="link">mail</a>
         </nav>
 
         <!-- Footer -->
@@ -600,7 +625,7 @@
         // Format: { filename: 'your-song.mp3', title: 'Your Song Title' }
         const defaultTracks = [
             { filename: 'song1.mp3', title: 'Song One' },
-            { filename: 'song2.mp3', title: 'Song Two' },
+            filename: 'song2.mp3', title: 'Song Two' },
             { filename: 'song3.mp3', title: 'Song Three' }
         ];
 
@@ -610,11 +635,14 @@
         const tonearm = document.getElementById('tonearm');
         const audioPlayer = document.getElementById('audioPlayer');
         const nowPlaying = document.getElementById('nowPlaying');
+        const guidance = document.getElementById('guidance');
 
         // State
         let isPlaying = false;
         let currentTrack = null;
+        let currentTrackIndex = -1;
         let tracks = [];
+        let isFirstTap = true;
 
         // Load songs from JSON file or use defaults
         async function loadTracks() {
@@ -640,7 +668,7 @@
                 }));
             }
 
-            // Select random track
+            // Select random track on page load
             selectRandomTrack();
         }
 
@@ -648,17 +676,51 @@
         function selectRandomTrack() {
             if (tracks.length === 0) return;
             const randomIndex = Math.floor(Math.random() * tracks.length);
+            currentTrackIndex = randomIndex;
             currentTrack = tracks[randomIndex];
             audioPlayer.src = currentTrack.url;
             nowPlaying.textContent = `now playing: ${currentTrack.title}`;
-            console.log('Selected track:', currentTrack.title);
         }
 
-        // Toggle play/pause
+        // Play next track
+        function playNextTrack() {
+            if (tracks.length === 0) return;
+            
+            // Select a different random track (not the current one)
+            let nextIndex;
+            do {
+                nextIndex = Math.floor(Math.random() * tracks.length);
+            } while (tracks.length > 1 && nextIndex === currentTrackIndex);
+            
+            currentTrackIndex = nextIndex;
+            currentTrack = tracks[nextIndex];
+            audioPlayer.src = currentTrack.url;
+            nowPlaying.textContent = `now playing: ${currentTrack.title}`;
+            
+            // Play immediately
+            audioPlayer.play().then(() => {
+                isPlaying = true;
+                vinylContainer.classList.add('spinning');
+                tonearm.classList.add('playing');
+                nowPlaying.classList.add('visible');
+            }).catch(error => {
+                console.log('Playback failed:', error);
+            });
+        }
+
+        // Toggle play/pause or next track if already playing
         function togglePlayback() {
+            // Hide guidance on first tap
+            if (isFirstTap) {
+                guidance.classList.add('hidden');
+                isFirstTap = false;
+            }
+
             if (isPlaying) {
-                pauseMusic();
+                // If already playing, play next track
+                playNextTrack();
             } else {
+                // If not playing, play current track
                 playMusic();
             }
         }
@@ -672,7 +734,6 @@
                 nowPlaying.classList.add('visible');
             }).catch(error => {
                 console.log('Playback failed:', error);
-                // Error message removed as requested
             });
         }
 
@@ -703,7 +764,6 @@
         // Handle audio error (file not found)
         audioPlayer.addEventListener('error', () => {
             console.log('Audio file not found');
-            // Error message removed as requested
         });
 
         // Initialize
