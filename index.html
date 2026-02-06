@@ -297,7 +297,7 @@
             );
             border-radius: 4px;
             transform-origin: 50% 0;
-            transform: rotate(-25deg);
+            transform: rotate(-18deg); /* UPDATED: Better rest position */
             box-shadow:
                 2px 2px 8px rgba(0, 0, 0, 0.5),
                 inset 1px 0 1px rgba(255, 255, 255, 0.05);
@@ -358,9 +358,49 @@
             box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
         }
 
-        /* Tonearm playing position */
+        /* Tonearm rest stand - NEW PROFESSIONAL STAND */
+        .tonearm-rest-stand {
+            position: absolute;
+            top: 165px;
+            right: -15px;
+            width: 25px;
+            height: 25px;
+            background: linear-gradient(
+                145deg,
+                #2d2418 0%,
+                #1a130c 50%,
+                #0d0905 100%
+            );
+            border-radius: 3px;
+            box-shadow:
+                2px 2px 8px rgba(0, 0, 0, 0.6),
+                inset 0 1px 1px rgba(255, 255, 255, 0.05);
+            z-index: 9;
+            transform: rotate(45deg);
+        }
+
+        /* Rest stand groove for needle */
+        .tonearm-rest-stand::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 2px;
+            background: linear-gradient(
+                90deg,
+                #5a4d3d 0%,
+                #3d3328 50%,
+                #5a4d3d 100%
+            );
+            border-radius: 1px;
+            box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Tonearm playing position - UPDATED FOR BETTER ALIGNMENT */
         .tonearm.playing {
-            transform: rotate(18deg);
+            transform: rotate(15deg); /* UPDATED: Better playing position */
         }
 
         /* Tagline with highlighted text effect */
@@ -551,6 +591,13 @@
             .guidance {
                 bottom: -45px;
             }
+            
+            .tonearm-rest-stand {
+                top: 140px;
+                right: -12px;
+                width: 22px;
+                height: 22px;
+            }
         }
 
         @media (max-height: 550px) {
@@ -574,6 +621,13 @@
             .guidance {
                 bottom: -40px;
                 font-size: 0.65rem;
+            }
+            
+            .tonearm-rest-stand {
+                top: 115px;
+                right: -10px;
+                width: 20px;
+                height: 20px;
             }
         }
     </style>
@@ -613,6 +667,9 @@
                         <div class="tonearm-head"></div>
                     </div>
                     <div class="counterweight"></div>
+                    
+                    <!-- NEW: Professional tonearm rest stand -->
+                    <div class="tonearm-rest-stand"></div>
                 </div>
 
                 <!-- Guidance text -->
