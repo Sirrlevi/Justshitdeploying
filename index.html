@@ -297,7 +297,7 @@
             );
             border-radius: 4px;
             transform-origin: 50% 0;
-            transform: rotate(-18deg); /* UPDATED: Better rest position */
+            transform: rotate(-18deg);
             box-shadow:
                 2px 2px 8px rgba(0, 0, 0, 0.5),
                 inset 1px 0 1px rgba(255, 255, 255, 0.05);
@@ -398,9 +398,9 @@
             box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
         }
 
-        /* Tonearm playing position - UPDATED FOR BETTER ALIGNMENT */
+        /* Tonearm playing position */
         .tonearm.playing {
-            transform: rotate(15deg); /* UPDATED: Better playing position */
+            transform: rotate(15deg);
         }
 
         /* Tagline with highlighted text effect */
@@ -417,7 +417,7 @@
             opacity: 0.95;
         }
 
-        /* Divider line with glow - UPDATED WIDTH: 80px to 120px */
+        /* Divider line with glow */
         .divider {
             width: 120px;
             height: 1px;
@@ -487,16 +487,59 @@
             width: 120%;
         }
 
-        /* Footer with subtle glow - UPDATED OPACITY AND COLOR */
+        /* Footer with enhanced animation container */
         .footer {
-            font-size: 0.8rem;
-            font-weight: 300;
-            letter-spacing: 0.18em;
-            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 400;
+            letter-spacing: 0.1em;
+            color: var(--text-highlight);
             text-transform: lowercase;
-            opacity: 0.95;
             margin-top: 2rem;
-            text-shadow: 0 0 12px rgba(201, 168, 108, 0.4);
+            text-shadow: 0 0 12px rgba(201, 168, 108, 0.5);
+            position: relative;
+            min-height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s ease;
+        }
+        
+        /* Animated text wrapper */
+        .animated-footer-text {
+            display: inline-block;
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), filter 0.5s ease-out, transform 0.5s ease;
+            opacity: 1;
+            filter: blur(0px);
+            transform: translateY(0);
+            will-change: transform, opacity, filter;
+            text-align: center;
+            line-height: 1.4;
+        }
+        
+        .animated-footer-text.fade-out {
+            opacity: 0;
+            filter: blur(4px);
+            transform: translateY(-6px);
+        }
+        
+        .animated-footer-text.fade-in {
+            animation: gentleAppear 0.65s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
+        }
+        
+        @keyframes gentleAppear {
+            0% {
+                opacity: 0;
+                filter: blur(5px);
+                transform: translateY(8px);
+            }
+            40% {
+                opacity: 0.3;
+            }
+            100% {
+                opacity: 1;
+                filter: blur(0px);
+                transform: translateY(0);
+            }
         }
 
         /* Hidden audio element */
@@ -524,18 +567,18 @@
             opacity: 0.8;
         }
 
-        /* Guidance text - IMPROVED VISIBILITY AND POSITION */
+        /* Guidance text */
         .guidance {
             position: absolute;
-            bottom: -50px; /* Moved up from -60px */
+            bottom: -50px;
             left: 50%;
             transform: translateX(-50%);
             font-size: 0.7rem;
             font-weight: 300;
             letter-spacing: 0.1em;
-            color: var(--text-highlight); /* Changed from muted to highlight */
+            color: var(--text-highlight);
             text-align: center;
-            opacity: 0.9; /* Increased from 0.8 */
+            opacity: 0.9;
             transition: opacity 0.5s ease;
             white-space: nowrap;
             z-index: 5;
@@ -693,16 +736,61 @@
             <a href="mailto:sirrvetohere@gmail.com" class="link">mail</a>
         </nav>
 
-        <!-- Footer -->
-        <footer class="footer">✿︎ PRIYA ✿︎</footer>
+        <!-- Footer with multilingual animated text -->
+        <footer class="footer" id="animatedFooter">
+            <span class="animated-footer-text" id="footerText">✿︎ ILYSM PRIYA ✿︎</span>
+        </footer>
     </div>
 
     <!-- Hidden audio element -->
     <audio id="audioPlayer" preload="auto"></audio>
 
     <script>
-        // Configuration - Update this array with your songs from the songs folder
-        // Format: { filename: 'your-song.mp3', title: 'Your Song Title' }
+        // ==================== MULTILINGUAL "ILYSM PRIYA" TRANSLATIONS ====================
+        // Beautiful collection of "I Love You So Much Priya" or "ILYSM PRIYA" in languages worldwide
+        const languageVariations = [
+            { lang: "english", text: "✿︎ ILYSM PRIYA ✿︎" },
+            { lang: "hindi", text: "✿︎ आई लव यू सो मच प्रिया ✿︎" },
+            { lang: "urdu", text: "✿︎ مجھے تم سے بہت پیار ہے پریا ✿︎" },
+            { lang: "sanskrit", text: "✿︎ प्रिया त्वां बहु स्निह्यामि ✿︎" },
+            { lang: "tamil", text: "✿︎ ஐ லவ் யூ சோ மச் பிரியா ✿︎" },
+            { lang: "telugu", text: "✿︎ ఐ లవ్ యూ సో మచ్ ప్రియా ✿︎" },
+            { lang: "bengali", text: "✿︆ আই লাভ ইউ সো মাচ প্রিয়া ✿︆" },
+            { lang: "punjabi", text: "✿︎ ਆਈ ਲਵ ਯੂ ਸੋ ਮੱਚ ਪ੍ਰਿਆ ✿︎" },
+            { lang: "gujarati", text: "✿︎ આઈ લવ યૂ સો મચ પ્રિયા ✿︎" },
+            { lang: "marathi", text: "✿︎ आय लव यू सो मच प्रिया ✿︎" },
+            { lang: "japanese", text: "✿︎ プリヤ、大好き ✿︎" },
+            { lang: "chinese simplified", text: "✿︎ 超级爱你，普丽雅 ✿︎" },
+            { lang: "chinese traditional", text: "✿︎ 超級愛你，普麗雅 ✿︎" },
+            { lang: "korean", text: "✿︎ 프리야 정말 사랑해 ✿︎" },
+            { lang: "french", text: "✿︎ Je t'aime tellement Priya ✿︎" },
+            { lang: "spanish", text: "✿︎ Te quiero muchísimo Priya ✿︎" },
+            { lang: "italian", text: "✿︎ Ti amo tantissimo Priya ✿︎" },
+            { lang: "german", text: "✿︎ Ich liebe dich so sehr Priya ✿︎" },
+            { lang: "portuguese", text: "✿︎ Eu te amo tanto Priya ✿︎" },
+            { lang: "russian", text: "✿︎ Я так сильно люблю тебя, Прия ✿︎" },
+            { lang: "greek", text: "✿︎ Σ' αγαπώ τόσο πολύ Πρίγια ✿︎" },
+            { lang: "turkish", text: "✿︎ Seni çok seviyorum Priya ✿︎" },
+            { lang: "arabic", text: "✿︎ أحبك كثيراً بريا ✿︎" },
+            { lang: "persian", text: "✿︎ خیلی دوستت دارم پریا ✿︎" },
+            { lang: "swahili", text: "✿︎ Nakupenda sana Priya ✿︎" },
+            { lang: "thai", text: "✿︎ รักเธอมากๆนะ ปริยา ✿︎" },
+            { lang: "vietnamese", text: "✿︎ Yêu Priya rất nhiều ✿︎" },
+            { lang: "dutch", text: "✿︎ Ik hou zoveel van je Priya ✿︎" },
+            { lang: "polish", text: "✿︎ Kocham cię tak bardzo Priya ✿︎" },
+            { lang: "swedish", text: "✿︎ Jag älskar dig så mycket Priya ✿︎" },
+            { lang: "czech", text: "✿︎ Miluji tě tolik Priya ✿︎" },
+            { lang: "hebrew", text: "✿︎ אני אוהבת אותך כל כך פריה ✿︎" },
+            { lang: "indonesian", text: "✿︎ Aku sangat mencintaimu Priya ✿︎" },
+            { lang: "malay", text: "✿︎ Aku sayang sangat Priya ✿︎" },
+            { lang: "filipino", text: "✿︎ Mahal na mahal kita Priya ✿︎" },
+            { lang: "latin", text: "✿︎ Te amo valde, Priya ✿︎" },
+            { lang: "welsh", text: "✿︎ Rwy'n dy garu cymaint Priya ✿︎" },
+            { lang: "irish", text: "✿︎ Is breá liom thú an méid sin Priya ✿︎" },
+            { lang: "icelandic", text: "✿︎ Ég elska þig svo mikið Priya ✿︎" }
+        ];
+
+        // Configuration - tracks array
         const defaultTracks = [
             { filename: 'song1.mp3', title: 'Song One' },
             { filename: 'song2.mp3', title: 'Song Two' },
@@ -717,6 +805,7 @@
         const audioPlayer = document.getElementById('audioPlayer');
         const nowPlaying = document.getElementById('nowPlaying');
         const guidance = document.getElementById('guidance');
+        const footerTextSpan = document.getElementById('footerText');
 
         // State
         let isPlaying = false;
@@ -724,8 +813,13 @@
         let currentTrackIndex = -1;
         let tracks = [];
         let isFirstTap = true;
+        
+        // Multilingual animation state
+        let currentLangIndex = 0;
+        let animationInterval = null;
+        let isTransitioning = false;
 
-        // Load songs from JSON file or use defaults
+        // Load songs from JSON or defaults
         async function loadTracks() {
             try {
                 const response = await fetch('songs/songs.json');
@@ -749,8 +843,9 @@
                 }));
             }
 
-            // Select random track on page load
-            selectRandomTrack();
+            if (tracks.length > 0) {
+                selectRandomTrack();
+            }
         }
 
         // Select random track
@@ -766,19 +861,14 @@
         // Play next track
         function playNextTrack() {
             if (tracks.length === 0) return;
-            
-            // Select a different random track (not the current one)
             let nextIndex;
             do {
                 nextIndex = Math.floor(Math.random() * tracks.length);
             } while (tracks.length > 1 && nextIndex === currentTrackIndex);
-            
             currentTrackIndex = nextIndex;
             currentTrack = tracks[nextIndex];
             audioPlayer.src = currentTrack.url;
             nowPlaying.textContent = `now playing: ${currentTrack.title}`;
-            
-            // Play immediately
             audioPlayer.play().then(() => {
                 isPlaying = true;
                 vinylContainer.classList.add('spinning');
@@ -791,12 +881,10 @@
 
         // Toggle play/pause
         function togglePlayback() {
-            // Hide guidance on first tap
             if (isFirstTap) {
                 guidance.classList.add('hidden');
                 isFirstTap = false;
             }
-
             if (isPlaying) {
                 pauseMusic();
             } else {
@@ -825,22 +913,67 @@
             nowPlaying.classList.remove('visible');
         }
 
-        // Next track function
         function nextTrack() {
-            // Hide guidance on first tap
             if (isFirstTap) {
                 guidance.classList.add('hidden');
                 isFirstTap = false;
             }
-            
             playNextTrack();
         }
+
+        // ========== MULTILINGUAL ANIMATION WITH SMOOTH BLUR & FADE ==========
+        function updateFooterTextWithAnimation() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+            
+            // Apply fade-out + blur effect
+            footerTextSpan.classList.remove('fade-in');
+            footerTextSpan.classList.add('fade-out');
+            
+            setTimeout(() => {
+                // Change text to next language variation
+                currentLangIndex = (currentLangIndex + 1) % languageVariations.length;
+                const nextText = languageVariations[currentLangIndex].text;
+                footerTextSpan.textContent = nextText;
+                
+                // Remove fade-out and apply fade-in with blur-to-clear transition
+                footerTextSpan.classList.remove('fade-out');
+                footerTextSpan.classList.add('fade-in');
+                
+                setTimeout(() => {
+                    isTransitioning = false;
+                }, 650);
+            }, 500);
+        }
+        
+        // Start the multilingual carousel with smooth transitions
+        function startMultilingualCarousel() {
+            if (animationInterval) clearInterval(animationInterval);
+            // Change language every 3.8 seconds for a calm, elegant rhythm
+            animationInterval = setInterval(() => {
+                updateFooterTextWithAnimation();
+            }, 4200);
+        }
+
+        // Audio ended handler
+        audioPlayer.addEventListener('ended', () => {
+            isPlaying = false;
+            vinylContainer.classList.remove('spinning');
+            tonearm.classList.remove('playing');
+            nowPlaying.classList.remove('visible');
+            setTimeout(() => {
+                playNextTrack();
+            }, 1000);
+        });
+
+        audioPlayer.addEventListener('error', () => {
+            console.log('Audio file not found');
+        });
 
         // Event listeners
         vinylClick.addEventListener('click', togglePlayback);
         tonearmClick.addEventListener('click', nextTrack);
         
-        // Touch events for mobile
         vinylClick.addEventListener('touchstart', (e) => {
             e.preventDefault();
             togglePlayback();
@@ -851,26 +984,14 @@
             nextTrack();
         }, { passive: false });
 
-        // Handle audio ended
-        audioPlayer.addEventListener('ended', () => {
-            isPlaying = false;
-            vinylContainer.classList.remove('spinning');
-            tonearm.classList.remove('playing');
-            nowPlaying.classList.remove('visible');
-            
-            // Auto-play next track when current ends
-            setTimeout(() => {
-                playNextTrack();
-            }, 1000);
-        });
-
-        // Handle audio error (file not found)
-        audioPlayer.addEventListener('error', () => {
-            console.log('Audio file not found');
-        });
-
-        // Initialize
+        // Initialize everything
         loadTracks();
+        startMultilingualCarousel();
+        
+        // Small delay to set initial footer with subtle appearance
+        setTimeout(() => {
+            footerTextSpan.classList.add('fade-in');
+        }, 200);
     </script>
 </body>
 </html>
