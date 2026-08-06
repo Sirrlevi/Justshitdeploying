@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>I LOVE PRIYA SO MUCH</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>I LOVE SANA SO MUCH</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
     <style>
         * {
             margin: 0;
@@ -24,7 +24,8 @@
             --accent-gold: #c9a86c;
         }
 
-        html, body {
+        html,
+        body {
             height: 100%;
             width: 100%;
             overflow: hidden;
@@ -43,7 +44,6 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Dark textured background */
         .bg-texture {
             position: fixed;
             top: 0;
@@ -58,23 +58,19 @@
             z-index: 0;
         }
 
-        /* Dark overlay for more depth */
         .bg-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(
-                180deg,
-                rgba(13, 8, 4, 0.4) 0%,
-                rgba(26, 15, 8, 0.2) 50%,
-                rgba(13, 8, 4, 0.5) 100%
-            );
+            background: linear-gradient(180deg,
+                    rgba(13, 8, 4, 0.4) 0%,
+                    rgba(26, 15, 8, 0.2) 50%,
+                    rgba(13, 8, 4, 0.5) 100%);
             z-index: 1;
         }
 
-        /* Film grain overlay */
         .grain-overlay {
             position: fixed;
             top: 0;
@@ -87,7 +83,6 @@
             background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
         }
 
-        /* Vignette effect */
         .vignette {
             position: fixed;
             top: 0;
@@ -96,15 +91,12 @@
             height: 100%;
             pointer-events: none;
             z-index: 999;
-            background: radial-gradient(
-                ellipse at center,
-                transparent 30%,
-                rgba(5, 3, 1, 0.4) 70%,
-                rgba(5, 3, 1, 0.8) 100%
-            );
+            background: radial-gradient(ellipse at center,
+                    transparent 30%,
+                    rgba(5, 3, 1, 0.4) 70%,
+                    rgba(5, 3, 1, 0.8) 100%);
         }
 
-        /* Main container */
         .container {
             width: 100%;
             max-width: 420px;
@@ -117,7 +109,6 @@
             z-index: 10;
         }
 
-        /* Vinyl section */
         .vinyl-section {
             width: 100%;
             display: flex;
@@ -134,7 +125,6 @@
             user-select: none;
         }
 
-        /* Vinyl click area */
         .vinyl-click-area {
             position: absolute;
             top: 0;
@@ -145,7 +135,6 @@
             z-index: 2;
         }
 
-        /* Realistic vinyl shadow - lifted effect */
         .vinyl-shadow {
             position: absolute;
             top: 15px;
@@ -153,18 +142,15 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            background: radial-gradient(
-                ellipse at 30% 30%,
-                rgba(0, 0, 0, 0.5) 0%,
-                rgba(0, 0, 0, 0.8) 50%,
-                rgba(0, 0, 0, 0.95) 100%
-            );
+            background: radial-gradient(ellipse at 30% 30%,
+                    rgba(0, 0, 0, 0.5) 0%,
+                    rgba(0, 0, 0, 0.8) 50%,
+                    rgba(0, 0, 0, 0.95) 100%);
             filter: blur(20px);
             z-index: 1;
             transform: scale(0.95);
         }
 
-        /* Secondary shadow for depth */
         .vinyl-shadow::after {
             content: '';
             position: absolute;
@@ -173,15 +159,12 @@
             width: calc(100% + 20px);
             height: calc(100% + 20px);
             border-radius: 50%;
-            background: radial-gradient(
-                ellipse at center,
-                transparent 60%,
-                rgba(0, 0, 0, 0.3) 100%
-            );
+            background: radial-gradient(ellipse at center,
+                    transparent 60%,
+                    rgba(0, 0, 0, 0.3) 100%);
             filter: blur(30px);
         }
 
-        /* Vinyl record container for smooth rotation */
         .vinyl-container {
             position: absolute;
             top: 0;
@@ -199,7 +182,6 @@
             display: block;
         }
 
-        /* Smooth rotation - no wobble */
         .vinyl-container.spinning {
             animation: vinylSpin 1.8s linear infinite;
         }
@@ -213,7 +195,6 @@
             }
         }
 
-        /* Vinyl shine/reflection overlay */
         .vinyl-shine {
             position: absolute;
             top: 0;
@@ -221,18 +202,15 @@
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            background: linear-gradient(
-                135deg,
-                rgba(255, 255, 255, 0.15) 0%,
-                transparent 30%,
-                transparent 70%,
-                rgba(255, 255, 255, 0.05) 100%
-            );
+            background: linear-gradient(135deg,
+                    rgba(255, 255, 255, 0.15) 0%,
+                    transparent 30%,
+                    transparent 70%,
+                    rgba(255, 255, 255, 0.05) 100%);
             pointer-events: none;
             z-index: 3;
         }
 
-        /* Tonearm assembly */
         .tonearm-assembly {
             position: absolute;
             top: -30px;
@@ -243,19 +221,16 @@
             cursor: pointer;
         }
 
-        /* Tonearm base/pivot */
         .tonearm-base {
             position: absolute;
             top: 0;
             right: 0;
             width: 45px;
             height: 45px;
-            background: linear-gradient(
-                145deg,
-                #3d3328 0%,
-                #1f1810 50%,
-                #0d0905 100%
-            );
+            background: linear-gradient(145deg,
+                    #3d3328 0%,
+                    #1f1810 50%,
+                    #0d0905 100%);
             border-radius: 50%;
             box-shadow:
                 inset 1px 1px 2px rgba(255, 255, 255, 0.1),
@@ -271,30 +246,25 @@
             transform: translate(-50%, -50%);
             width: 15px;
             height: 15px;
-            background: linear-gradient(
-                145deg,
-                #5a4d3d 0%,
-                #2a2218 100%
-            );
+            background: linear-gradient(145deg,
+                    #5a4d3d 0%,
+                    #2a2218 100%);
             border-radius: 50%;
             box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
 
-        /* Tonearm arm - rotates from pivot */
         .tonearm {
             position: absolute;
             top: 22px;
             right: 22px;
             width: 8px;
             height: 170px;
-            background: linear-gradient(
-                90deg,
-                #4a4035 0%,
-                #2d2418 30%,
-                #1f1810 50%,
-                #2d2418 70%,
-                #4a4035 100%
-            );
+            background: linear-gradient(90deg,
+                    #4a4035 0%,
+                    #2d2418 30%,
+                    #1f1810 50%,
+                    #2d2418 70%,
+                    #4a4035 100%);
             border-radius: 4px;
             transform-origin: 50% 0;
             transform: rotate(-18deg);
@@ -304,7 +274,6 @@
             transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Tonearm head shell */
         .tonearm-head {
             position: absolute;
             bottom: -5px;
@@ -312,18 +281,15 @@
             transform: translateX(-50%);
             width: 18px;
             height: 35px;
-            background: linear-gradient(
-                180deg,
-                #3d3328 0%,
-                #1f1810 100%
-            );
+            background: linear-gradient(180deg,
+                    #3d3328 0%,
+                    #1f1810 100%);
             border-radius: 3px;
             box-shadow:
                 2px 2px 6px rgba(0, 0, 0, 0.5),
                 inset 1px 1px 1px rgba(255, 255, 255, 0.05);
         }
 
-        /* Cartridge/needle */
         .tonearm-head::after {
             content: '';
             position: absolute;
@@ -332,45 +298,37 @@
             transform: translateX(-50%);
             width: 4px;
             height: 12px;
-            background: linear-gradient(
-                180deg,
-                #c9a86c 0%,
-                #8b7355 100%
-            );
+            background: linear-gradient(180deg,
+                    #c9a86c 0%,
+                    #8b7355 100%);
             border-radius: 1px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
         }
 
-        /* Counterweight */
         .counterweight {
             position: absolute;
             top: 100px;
             right: 18px;
             width: 20px;
             height: 25px;
-            background: linear-gradient(
-                90deg,
-                #2d2418 0%,
-                #1f1810 50%,
-                #2d2418 100%
-            );
+            background: linear-gradient(90deg,
+                    #2d2418 0%,
+                    #1f1810 50%,
+                    #2d2418 100%);
             border-radius: 3px;
             box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
         }
 
-        /* Tonearm rest stand - NEW PROFESSIONAL STAND */
         .tonearm-rest-stand {
             position: absolute;
             top: 165px;
             right: -15px;
             width: 25px;
             height: 25px;
-            background: linear-gradient(
-                145deg,
-                #2d2418 0%,
-                #1a130c 50%,
-                #0d0905 100%
-            );
+            background: linear-gradient(145deg,
+                    #2d2418 0%,
+                    #1a130c 50%,
+                    #0d0905 100%);
             border-radius: 3px;
             box-shadow:
                 2px 2px 8px rgba(0, 0, 0, 0.6),
@@ -379,7 +337,6 @@
             transform: rotate(45deg);
         }
 
-        /* Rest stand groove for needle */
         .tonearm-rest-stand::after {
             content: '';
             position: absolute;
@@ -388,22 +345,18 @@
             transform: translate(-50%, -50%);
             width: 12px;
             height: 2px;
-            background: linear-gradient(
-                90deg,
-                #5a4d3d 0%,
-                #3d3328 50%,
-                #5a4d3d 100%
-            );
+            background: linear-gradient(90deg,
+                    #5a4d3d 0%,
+                    #3d3328 50%,
+                    #5a4d3d 100%);
             border-radius: 1px;
             box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
         }
 
-        /* Tonearm playing position */
         .tonearm.playing {
             transform: rotate(15deg);
         }
 
-        /* Tagline with highlighted text effect */
         .tagline {
             font-size: 1.25rem;
             font-weight: 400;
@@ -417,23 +370,19 @@
             opacity: 0.95;
         }
 
-        /* Divider line with glow */
         .divider {
             width: 120px;
             height: 1px;
-            background: linear-gradient(
-                90deg,
-                transparent,
-                rgba(201, 168, 108, 0.4),
-                rgba(232, 212, 168, 0.6),
-                rgba(201, 168, 108, 0.4),
-                transparent
-            );
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(201, 168, 108, 0.4),
+                    rgba(232, 212, 168, 0.6),
+                    rgba(201, 168, 108, 0.4),
+                    transparent);
             margin-bottom: 2.5rem;
             box-shadow: 0 0 10px rgba(201, 168, 108, 0.2);
         }
 
-        /* Links section */
         .links {
             display: flex;
             flex-direction: column;
@@ -463,12 +412,10 @@
             transform: translateX(-50%);
             width: 0;
             height: 1px;
-            background: linear-gradient(
-                90deg,
-                transparent,
-                var(--accent-gold),
-                transparent
-            );
+            background: linear-gradient(90deg,
+                    transparent,
+                    var(--accent-gold),
+                    transparent);
             transition: width 0.3s ease;
             box-shadow: 0 0 8px rgba(201, 168, 108, 0.4);
         }
@@ -487,7 +434,6 @@
             width: 120%;
         }
 
-        /* Footer with enhanced animation container */
         .footer {
             font-size: 0.85rem;
             font-weight: 400;
@@ -503,11 +449,12 @@
             justify-content: center;
             transition: all 0.1s ease;
         }
-        
-        /* Animated text wrapper */
+
         .animated-footer-text {
             display: inline-block;
-            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1), filter 0.5s ease-out, transform 0.5s ease;
+            transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.4, 1.1),
+                filter 0.5s ease-out,
+                transform 0.5s ease;
             opacity: 1;
             filter: blur(0px);
             transform: translateY(0);
@@ -515,17 +462,17 @@
             text-align: center;
             line-height: 1.4;
         }
-        
+
         .animated-footer-text.fade-out {
             opacity: 0;
             filter: blur(4px);
             transform: translateY(-6px);
         }
-        
+
         .animated-footer-text.fade-in {
             animation: gentleAppear 0.65s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
         }
-        
+
         @keyframes gentleAppear {
             0% {
                 opacity: 0;
@@ -542,12 +489,10 @@
             }
         }
 
-        /* Hidden audio element */
         audio {
             display: none;
         }
 
-        /* Now playing indicator */
         .now-playing {
             position: absolute;
             bottom: -40px;
@@ -567,7 +512,6 @@
             opacity: 0.8;
         }
 
-        /* Guidance text */
         .guidance {
             position: absolute;
             bottom: -50px;
@@ -590,17 +534,14 @@
             pointer-events: none;
         }
 
-        /* Responsive adjustments */
         @media (min-height: 850px) {
             .container {
                 padding-top: 12vh;
             }
-
             .vinyl-wrapper {
                 width: 300px;
                 height: 300px;
             }
-
             .vinyl-shadow {
                 top: 18px;
                 left: 18px;
@@ -611,30 +552,24 @@
             .container {
                 padding-top: 8vh;
             }
-
             .vinyl-wrapper {
                 width: 240px;
                 height: 240px;
             }
-
             .tonearm-assembly {
                 width: 140px;
                 height: 190px;
             }
-
             .tagline {
                 margin-bottom: 2rem;
                 font-size: 1.1rem;
             }
-
             .divider {
                 margin-bottom: 2rem;
             }
-            
             .guidance {
                 bottom: -45px;
             }
-            
             .tonearm-rest-stand {
                 top: 140px;
                 right: -12px;
@@ -648,24 +583,20 @@
                 width: 200px;
                 height: 200px;
             }
-
             .tonearm-assembly {
                 width: 120px;
                 height: 160px;
                 top: -20px;
                 right: -30px;
             }
-
             .tagline {
                 font-size: 1rem;
                 margin-bottom: 1.5rem;
             }
-            
             .guidance {
                 bottom: -40px;
                 font-size: 0.65rem;
             }
-            
             .tonearm-rest-stand {
                 top: 115px;
                 right: -10px;
@@ -676,90 +607,102 @@
     </style>
 </head>
 <body>
-    <!-- Dark textured background -->
+
+    <!-- Background layers -->
     <div class="bg-texture"></div>
     <div class="bg-overlay"></div>
-
-    <!-- Film grain overlay -->
     <div class="grain-overlay"></div>
-
-    <!-- Vignette effect -->
     <div class="vignette"></div>
 
     <!-- Main container -->
     <div class="container">
+
         <!-- Vinyl section -->
         <div class="vinyl-section">
             <div class="vinyl-wrapper">
-                <!-- Realistic shadow -->
+
                 <div class="vinyl-shadow"></div>
 
-                <!-- Vinyl container for smooth rotation -->
                 <div class="vinyl-container" id="vinylContainer">
-                    <img src="assets/vinyl-record.png" alt="Vinyl record" class="vinyl-record">
+                    <img src="assets/vinyl-record.png" alt="Vinyl record" class="vinyl-record" />
                     <div class="vinyl-shine"></div>
                 </div>
 
-                <!-- Vinyl click area (for play/pause) -->
                 <div class="vinyl-click-area" id="vinylClick"></div>
 
-                <!-- Detailed tonearm assembly (for next track) -->
                 <div class="tonearm-assembly" id="tonearmClick">
                     <div class="tonearm-base"></div>
                     <div class="tonearm" id="tonearm">
                         <div class="tonearm-head"></div>
                     </div>
                     <div class="counterweight"></div>
-                    
-                    <!-- NEW: Professional tonearm rest stand -->
                     <div class="tonearm-rest-stand"></div>
                 </div>
 
-                <!-- Guidance text -->
                 <div class="guidance" id="guidance">tap vinyl to play</div>
-
-                <!-- Now playing text -->
                 <div class="now-playing" id="nowPlaying"></div>
+
             </div>
         </div>
 
-        <!-- Tagline with highlighted effect -->
-        <p class="tagline">i write code nd collect music.</p>
+        <!-- Tagline -->
+        <p class="tagline">i write code &amp; collect music.</p>
 
-        <!-- Divider with glow -->
+        <!-- Divider -->
         <div class="divider"></div>
 
         <!-- Links -->
         <nav class="links">
-            <a href="https://www.instagram.com/mentallyfuvkkedup/" class="link" target="_blank" rel="noopener">instagram</a>
+            <a href="https://www.instagram.com/okay.neeraj/" class="link" target="_blank" rel="noopener">instagram</a>
             <a href="https://open.spotify.com/user/31pzqjv3mp74qojr6jvwkcgn4lvy?si=1BXcehAPRiOA9XqIP-Pvug" class="link" target="_blank" rel="noopener">spotify</a>
             <a href="mailto:sirrvetohere@gmail.com" class="link">mail</a>
         </nav>
 
-        <!-- Footer with multilingual animated text -->
+        <!-- Footer with animated text -->
         <footer class="footer" id="animatedFooter">
-            <span class="animated-footer-text" id="footerText">✿︎ I LOVE SANA MORE THAN ANYTHING ✿︎</span>
+            <span class="animated-footer-text" id="footerText">i love sana more than myself</span>
         </footer>
+
     </div>
 
-    <!-- Hidden audio element -->
+    <!-- Hidden audio -->
     <audio id="audioPlayer" preload="auto"></audio>
 
     <script>
-        // ==================== MULTILINGUAL "ILYSM PRIYA" TRANSLATIONS ====================
-        // Beautiful collection of "I Love You So Much Priya" or "ILYSM PRIYA" in languages worldwide
+        // ============================================================
+        //  MULTILINGUAL "lysm sana" — with initial 2‑second message
+        // ============================================================
+
+        // All variations of "lysm sana" (I love you so much Sana)
+        // in different languages. The first entry is the one that will
+        // appear *after* the initial 2‑second message.
         const languageVariations = [
-            { lang: "english", text: "✿︎ lysm Sana ✿︎" }
+            { lang: "english", text: "✿︎ lysm Sana ✿︎" },
+            { lang: "hindi", text: "✿︎ मैं सना से बहुत प्यार करता हूँ ✿︎" },
+            { lang: "spanish", text: "✿︎ Te quiero mucho Sana ✿︎" },
+            { lang: "french", text: "✿︎ Je t'aime tellement Sana ✿︎" },
+            { lang: "italian", text: "✿︎ Ti amo tantissimo Sana ✿︎" },
+            { lang: "japanese", text: "✿︎ サナをすごく愛してる ✿︎" },
+            { lang: "arabic", text: "✿︎ أحبك كثيراً سانا ✿︎" },
+            { lang: "korean", text: "✿︎ 사나를 정말 사랑해 ✿︎" },
+            { lang: "portuguese", text: "✿︎ Amo muito você Sana ✿︎" },
+            { lang: "german", text: "✿︎ Ich liebe dich so sehr Sana ✿︎" },
+            { lang: "russian", text: "✿︎ Я так сильно люблю Сану ✿︎" },
+            { lang: "turkish", text: "✿︎ Sana'yı çok seviyorum ✿︎" },
+            { lang: "bengali", text: "✿︎ আমি সানাকে খুব ভালোবাসি ✿︎" },
+            { lang: "urdu", text: "✿︎ مجھے سانا سے بہت پیار ہے ✿︎" },
+            { lang: "dutch", text: "✿︎ Ik hou zoveel van Sana ✿︎" },
+            { lang: "swedish", text: "✿︎ Jag älskar Sana så mycket ✿︎" },
+            { lang: "greek", text: "✿︎ Σ' αγαπώ τόσο πολύ Σάνα ✿︎" },
+            { lang: "hebrew", text: "✿︎ אני אוהב אותך כל כך סנה ✿︎" },
+            { lang: "thai", text: "✿︎ ฉันรักซาน่ามาก ✿︎" },
+            { lang: "vietnamese", text: "✿︎ Tôi yêu Sana rất nhiều ✿︎" },
         ];
 
-        // Configuration - tracks array
-        const defaultTracks = [
-            { filename: 'song1.mp3', title: 'Song One' },
-            { filename: 'song2.mp3', title: 'Song Two' },
-            { filename: 'song3.mp3', title: 'Song Three' }
-        ];
+        // ============================================================
+        //  DOM refs & state
+        // ============================================================
 
-        // DOM elements
         const vinylClick = document.getElementById('vinylClick');
         const tonearmClick = document.getElementById('tonearmClick');
         const vinylContainer = document.getElementById('vinylContainer');
@@ -769,19 +712,28 @@
         const guidance = document.getElementById('guidance');
         const footerTextSpan = document.getElementById('footerText');
 
-        // State
         let isPlaying = false;
         let currentTrack = null;
         let currentTrackIndex = -1;
         let tracks = [];
         let isFirstTap = true;
-        
-        // Multilingual animation state
+
+        // Multilingual carousel state
         let currentLangIndex = 0;
         let animationInterval = null;
         let isTransitioning = false;
+        let carouselStarted = false; // becomes true after 2‑second initial text
 
-        // Load songs from JSON or defaults
+        // ============================================================
+        //  Audio loading
+        // ============================================================
+
+        const defaultTracks = [
+            { filename: 'song1.mp3', title: 'Song One' },
+            { filename: 'song2.mp3', title: 'Song Two' },
+            { filename: 'song3.mp3', title: 'Song Three' },
+        ];
+
         async function loadTracks() {
             try {
                 const response = await fetch('songs/songs.json');
@@ -789,46 +741,40 @@
                     const data = await response.json();
                     tracks = data.tracks.map(t => ({
                         url: `songs/${t.filename}`,
-                        title: t.title
+                        title: t.title,
                     }));
                 } else {
                     tracks = defaultTracks.map(t => ({
                         url: `songs/${t.filename}`,
-                        title: t.title
+                        title: t.title,
                     }));
                 }
-            } catch (error) {
-                console.log('Using default tracks:', error);
+            } catch (_) {
                 tracks = defaultTracks.map(t => ({
                     url: `songs/${t.filename}`,
-                    title: t.title
+                    title: t.title,
                 }));
             }
-
-            if (tracks.length > 0) {
-                selectRandomTrack();
-            }
+            if (tracks.length > 0) selectRandomTrack();
         }
 
-        // Select random track
         function selectRandomTrack() {
             if (tracks.length === 0) return;
-            const randomIndex = Math.floor(Math.random() * tracks.length);
-            currentTrackIndex = randomIndex;
-            currentTrack = tracks[randomIndex];
+            const idx = Math.floor(Math.random() * tracks.length);
+            currentTrackIndex = idx;
+            currentTrack = tracks[idx];
             audioPlayer.src = currentTrack.url;
             nowPlaying.textContent = `now playing: ${currentTrack.title}`;
         }
 
-        // Play next track
         function playNextTrack() {
             if (tracks.length === 0) return;
-            let nextIndex;
+            let next;
             do {
-                nextIndex = Math.floor(Math.random() * tracks.length);
-            } while (tracks.length > 1 && nextIndex === currentTrackIndex);
-            currentTrackIndex = nextIndex;
-            currentTrack = tracks[nextIndex];
+                next = Math.floor(Math.random() * tracks.length);
+            } while (tracks.length > 1 && next === currentTrackIndex);
+            currentTrackIndex = next;
+            currentTrack = tracks[next];
             audioPlayer.src = currentTrack.url;
             nowPlaying.textContent = `now playing: ${currentTrack.title}`;
             audioPlayer.play().then(() => {
@@ -836,37 +782,31 @@
                 vinylContainer.classList.add('spinning');
                 tonearm.classList.add('playing');
                 nowPlaying.classList.add('visible');
-            }).catch(error => {
-                console.log('Playback failed:', error);
-            });
+            }).catch(() => {});
         }
 
-        // Toggle play/pause
+        // ============================================================
+        //  Playback controls
+        // ============================================================
+
         function togglePlayback() {
             if (isFirstTap) {
                 guidance.classList.add('hidden');
                 isFirstTap = false;
             }
-            if (isPlaying) {
-                pauseMusic();
-            } else {
-                playMusic();
-            }
+            if (isPlaying) pauseMusic();
+            else playMusic();
         }
 
-        // Play music
         function playMusic() {
             audioPlayer.play().then(() => {
                 isPlaying = true;
                 vinylContainer.classList.add('spinning');
                 tonearm.classList.add('playing');
                 nowPlaying.classList.add('visible');
-            }).catch(error => {
-                console.log('Playback failed:', error);
-            });
+            }).catch(() => {});
         }
 
-        // Pause music
         function pauseMusic() {
             audioPlayer.pause();
             isPlaying = false;
@@ -883,77 +823,98 @@
             playNextTrack();
         }
 
-        // ========== MULTILINGUAL ANIMATION WITH SMOOTH BLUR & FADE ==========
+        // ============================================================
+        //  Multilingual carousel with smooth blur/fade
+        // ============================================================
+
         function updateFooterTextWithAnimation() {
             if (isTransitioning) return;
             isTransitioning = true;
-            
-            // Apply fade-out + blur effect
+
             footerTextSpan.classList.remove('fade-in');
             footerTextSpan.classList.add('fade-out');
-            
+
             setTimeout(() => {
-                // Change text to next language variation
                 currentLangIndex = (currentLangIndex + 1) % languageVariations.length;
                 const nextText = languageVariations[currentLangIndex].text;
                 footerTextSpan.textContent = nextText;
-                
-                // Remove fade-out and apply fade-in with blur-to-clear transition
+
                 footerTextSpan.classList.remove('fade-out');
                 footerTextSpan.classList.add('fade-in');
-                
+
                 setTimeout(() => {
                     isTransitioning = false;
                 }, 650);
             }, 500);
         }
-        
-        // Start the multilingual carousel with smooth transitions
+
         function startMultilingualCarousel() {
             if (animationInterval) clearInterval(animationInterval);
-            // Change language every 3.8 seconds for a calm, elegant rhythm
+            // Start with the first variation (index 0) after the initial 2‑second message
+            currentLangIndex = 0;
+            footerTextSpan.textContent = languageVariations[0].text;
+            footerTextSpan.classList.remove('fade-out');
+            footerTextSpan.classList.add('fade-in');
+
+            carouselStarted = true;
             animationInterval = setInterval(() => {
                 updateFooterTextWithAnimation();
             }, 4200);
         }
 
-        // Audio ended handler
+        // ============================================================
+        //  Audio ended handler
+        // ============================================================
+
         audioPlayer.addEventListener('ended', () => {
             isPlaying = false;
             vinylContainer.classList.remove('spinning');
             tonearm.classList.remove('playing');
             nowPlaying.classList.remove('visible');
-            setTimeout(() => {
-                playNextTrack();
-            }, 1000);
+            setTimeout(() => playNextTrack(), 1000);
         });
 
-        audioPlayer.addEventListener('error', () => {
-            console.log('Audio file not found');
-        });
+        audioPlayer.addEventListener('error', () => {});
 
-        // Event listeners
+        // ============================================================
+        //  Event listeners
+        // ============================================================
+
         vinylClick.addEventListener('click', togglePlayback);
         tonearmClick.addEventListener('click', nextTrack);
-        
+
         vinylClick.addEventListener('touchstart', (e) => {
             e.preventDefault();
             togglePlayback();
         }, { passive: false });
-        
+
         tonearmClick.addEventListener('touchstart', (e) => {
             e.preventDefault();
             nextTrack();
         }, { passive: false });
 
-        // Initialize everything
+        // ============================================================
+        //  Init
+        // ============================================================
+
         loadTracks();
-        startMultilingualCarousel();
-        
-        // Small delay to set initial footer with subtle appearance
+
+        // Show the initial message "i love sana more than myself"
+        // for 2 seconds, then start the carousel.
+        footerTextSpan.textContent = 'i love sana more than myself';
+        footerTextSpan.classList.add('fade-in');
+
         setTimeout(() => {
-            footerTextSpan.classList.add('fade-in');
-        }, 200);
+            startMultilingualCarousel();
+        }, 2000);
+
+        // small safety: if the carousel hasn't started after 2.5s, force it
+        setTimeout(() => {
+            if (!carouselStarted) {
+                startMultilingualCarousel();
+            }
+        }, 2500);
     </script>
+
 </body>
 </html>
