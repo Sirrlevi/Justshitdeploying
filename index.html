@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>I LOVE PRIYA SO MUCH ❤️</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-deep: #070504;
+            --bg-mid: #120c08;
+            --cream: #f3e6d0;
+            --cream-soft: #e8d5b5;
+            --gold: #d4b07a;
+            --gold-bright: #f0d9a8;
+            --gold-glow: rgba(212, 176, 122, 0.55);
+            --text-muted: #8a7355;
+            --shadow-deep: rgba(0, 0, 0, 0.85);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background: var(--bg-deep);
+        }
+
+        body {
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            color: var(--cream);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            position: relative;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            cursor: default;
+        }
+
+        /* ========== ATMOSPHERE ========== */
+        .bg-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(ellipse 90% 70% at 50% 20%, rgba(40, 28, 16, 0.7) 0%, transparent 60%),
+                radial-gradient(ellipse 80% 50% at 50% 100%, rgba(25, 16, 8, 0.8) 0%, transparent 50%),
+                linear-gradient(180deg, #0a0705 0%, #120c08 40%, #0a0705 100%);
+        }
+
+        .bg-texture {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            background-image: url('assets/background-texture.jpg');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.38;
+            mix-blend-mode: soft-light;
+            pointer-events: none;
+        }
+
+        .grain {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0.09;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        .vignette {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            pointer-events: none;
+            background: radial-gradient(ellipse 75% 65% at 50% 40%,
+                transparent 20%,
+                rgba(5, 3, 1, 0.45) 70%,
+                rgba(3, 2, 1, 0.88) 100%);
+        }
+
+        /* Soft ambient light behind vinyl */
+        .ambient-glow {
+            position: fixed;
+            top: 18%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 520px;
+            height: 520px;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                rgba(212, 176, 122, 0.13) 0%,
+                rgba(180, 130, 70, 0.06) 35%,
+                transparent 70%);
+            z-index: 2;
+            pointer-events: none;
+            transition: opacity 1.2s ease, transform 1.2s ease;
+        }
+
+        .ambient-glow.playing {
+            opacity: 1.4;
+            transform: translateX(-50%) scale(1.08);
+        }
+
+        /* ========== MAIN CONTAINER ========== */
+        .container {
+            width: 100%;
+            max-width: 440px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 9vh 1.8rem 4vh;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* ========== VINYL SECTION ========== */
+        .vinyl-section {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2.8rem;
+            position: relative;
+        }
+
+        .vinyl-wrapper {
+            position: relative;
+            width: 290px;
+            height: 290px;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .vinyl-click-area {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        /* Soft outer glow when playing */
+        .vinyl-glow {
+            position: absolute;
+            inset: -18px;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                rgba(212, 176, 122, 0.22) 0%,
+                rgba(180, 130, 70, 0.08) 45%,
+                transparent 70%);
+            opacity: 0;
+            transition: opacity 0.9s ease;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .vinyl-glow.active {
+            opacity: 1;
+        }
+
+        .vinyl-shadow {
+            position: absolute;
+            top: 18px;
+            left: 14px;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at 40% 30%,
+                rgba(0, 0, 0, 0.55) 0%,
+                rgba(0, 0, 0, 0.85) 55%,
+                rgba(0, 0, 0, 0.95) 100%);
+            filter: blur(22px);
+            z-index: 2;
+            transform: scale(0.96);
+        }
+
+        .vinyl-container {
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            border-radius: 50%;
+            overflow: hidden;
+            box-shadow:
+                0 0 0 1px rgba(255, 230, 180, 0.08),
+                0 25px 50px -12px rgba(0, 0, 0, 0.7),
+                inset 0 0 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .vinyl-record {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            display: block;
+            will-change: transform;
+        }
+
+        /* Realistic spinning with slight ease */
+        .vinyl-container.spinning .vinyl-record {
+            animation: vinylSpin 2.4s linear infinite;
+        }
+
+        @keyframes vinylSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Moving highlight on the vinyl surface */
+        .vinyl-shine {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: linear-gradient(
+                125deg,
+                rgba(255, 245, 220, 0.18) 0%,
+                transparent 28%,
+                transparent 62%,
+                rgba(255, 240, 200, 0.06) 100%
+            );
+            pointer-events: none;
+            z-index: 6;
+            mix-blend-mode: soft-light;
+        }
+
+        .vinyl-container.spinning .vinyl-shine {
+            animation: shineRotate 2.4s linear infinite;
+        }
+
+        @keyframes shineRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Center label subtle pulse when playing */
+        .vinyl-center-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 78px;
+            height: 78px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(243, 230, 208, 0.15) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            z-index: 7;
+            pointer-events: none;
+        }
+
+        .vinyl-center-glow.active {
+            opacity: 1;
+        }
+
+        /* ========== TONEARM ========== */
+        .tonearm-assembly {
+            position: absolute;
+            top: -28px;
+            right: -38px;
+            width: 165px;
+            height: 230px;
+            z-index: 15;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tonearm-base {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(145deg, #4a3d2e 0%, #2a2118 45%, #15100b 100%);
+            border-radius: 50%;
+            box-shadow:
+                inset 1px 1px 3px rgba(255, 240, 200, 0.12),
+                4px 6px 16px rgba(0, 0, 0, 0.55),
+                0 0 0 1.5px rgba(0, 0, 0, 0.4);
+        }
+
+        .tonearm-base::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(145deg, #6b5a45 0%, #2e241a 100%);
+            border-radius: 50%;
+            box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6);
+        }
+
+        .tonearm {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            width: 7px;
+            height: 175px;
+            background: linear-gradient(90deg,
+                #5a4d3c 0%,
+                #2e241a 25%,
+                #1a140e 50%,
+                #2e241a 75%,
+                #5a4d3c 100%);
+            border-radius: 4px;
+            transform-origin: 50% 0;
+            transform: rotate(-20deg);
+            box-shadow:
+                2px 3px 10px rgba(0, 0, 0, 0.5),
+                inset 1px 0 1px rgba(255, 240, 200, 0.08);
+            transition: transform 1.05s cubic-bezier(0.22, 1.15, 0.36, 1);
+        }
+
+        .tonearm.playing {
+            transform: rotate(16deg);
+        }
+
+        .tonearm-head {
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 36px;
+            background: linear-gradient(180deg, #3f3428 0%, #1c1510 100%);
+            border-radius: 3px;
+            box-shadow:
+                2px 3px 8px rgba(0, 0, 0, 0.5),
+                inset 1px 1px 1px rgba(255, 240, 200, 0.06);
+        }
+
+        .tonearm-head::after {
+            content: '';
+            position: absolute;
+            bottom: -9px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3.5px;
+            height: 13px;
+            background: linear-gradient(180deg, #e0c080 0%, #a88850 100%);
+            border-radius: 1px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+        }
+
+        .counterweight {
+            position: absolute;
+            top: 105px;
+            right: 17px;
+            width: 22px;
+            height: 26px;
+            background: linear-gradient(90deg, #2e241a 0%, #1a140e 50%, #2e241a 100%);
+            border-radius: 3px;
+            box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.45);
+        }
+
+        .tonearm-rest {
+            position: absolute;
+            top: 172px;
+            right: -14px;
+            width: 26px;
+            height: 26px;
+            background: linear-gradient(145deg, #2e241a 0%, #18120c 60%, #0c0906 100%);
+            border-radius: 3px;
+            box-shadow:
+                2px 3px 10px rgba(0, 0, 0, 0.55),
+                inset 0 1px 1px rgba(255, 240, 200, 0.05);
+            z-index: 9;
+            transform: rotate(42deg);
+        }
+
+        /* ========== TEXT & LINKS ========== */
+        .tagline {
+            font-size: 1.32rem;
+            font-weight: 400;
+            letter-spacing: 0.12em;
+            color: var(--cream);
+            text-align: center;
+            margin-bottom: 0.35rem;
+            text-shadow:
+                0 0 28px rgba(212, 176, 122, 0.35),
+                0 0 60px rgba(180, 130, 70, 0.15);
+            opacity: 0.97;
+            line-height: 1.35;
+        }
+
+        .sub-tagline {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 300;
+            letter-spacing: 0.18em;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 2.1rem;
+            text-transform: uppercase;
+            opacity: 0.75;
+        }
+
+        .divider {
+            width: 90px;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(212, 176, 122, 0.35),
+                rgba(240, 217, 168, 0.7),
+                rgba(212, 176, 122, 0.35),
+                transparent);
+            margin-bottom: 2.3rem;
+            box-shadow: 0 0 14px rgba(212, 176, 122, 0.25);
+            position: relative;
+        }
+
+        .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--gold);
+            box-shadow: 0 0 10px var(--gold-glow);
+            opacity: 0.8;
+        }
+
+        .links {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.15rem;
+            margin-bottom: auto;
+        }
+
+        .link {
+            font-size: 1.05rem;
+            font-weight: 400;
+            letter-spacing: 0.16em;
+            color: var(--cream-soft);
+            text-decoration: none;
+            text-transform: lowercase;
+            position: relative;
+            opacity: 0.82;
+            transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+            padding: 0.15rem 0.4rem;
+        }
+
+        .link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            box-shadow: 0 0 10px rgba(212, 176, 122, 0.4);
+        }
+
+        .link:hover,
+        .link:active {
+            color: var(--cream);
+            opacity: 1;
+            text-shadow:
+                0 0 18px rgba(240, 217, 168, 0.4),
+                0 0 36px rgba(212, 176, 122, 0.2);
+            letter-spacing: 0.18em;
+        }
+
+        .link:hover::after,
+        .link:active::after {
+            width: 115%;
+        }
+
+        /* ========== FOOTER ========== */
+        .footer {
+            font-size: 0.88rem;
+            font-weight: 400;
+            letter-spacing: 0.08em;
+            color: var(--cream);
+            margin-top: 1.8rem;
+            text-shadow: 0 0 20px rgba(212, 176, 122, 0.45);
+            position: relative;
+            min-height: 2.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+        }
+
+        .footer-ornament {
+            font-size: 0.65rem;
+            opacity: 0.55;
+            color: var(--gold);
+        }
+
+        .animated-footer-text {
+            display: inline-block;
+            transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+                        filter 0.45s ease,
+                        transform 0.45s ease;
+            opacity: 1;
+            filter: blur(0);
+            transform: translateY(0);
+            text-align: center;
+            line-height: 1.4;
+            max-width: 280px;
+        }
+
+        .animated-footer-text.fade-out {
+            opacity: 0;
+            filter: blur(5px);
+            transform: translateY(-7px);
+        }
+
+        .animated-footer-text.fade-in {
+            animation: gentleAppear 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        @keyframes gentleAppear {
+            0% {
+                opacity: 0;
+                filter: blur(6px);
+                transform: translateY(10px);
+            }
+            100% {
+                opacity: 1;
+                filter: blur(0);
+                transform: translateY(0);
+            }
+        }
+
+        /* ========== NOW PLAYING & GUIDANCE ========== */
+        .now-playing {
+            position: absolute;
+            bottom: -42px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 400;
+            letter-spacing: 0.14em;
+            color: var(--gold);
+            opacity: 0;
+            transition: opacity 0.6s ease;
+            white-space: nowrap;
+            text-shadow: 0 0 14px rgba(212, 176, 122, 0.4);
+            text-transform: uppercase;
+        }
+
+        .now-playing.visible {
+            opacity: 0.85;
+        }
+
+        .guidance {
+            position: absolute;
+            bottom: -42px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 300;
+            letter-spacing: 0.16em;
+            color: var(--text-muted);
+            text-align: center;
+            opacity: 0.7;
+            transition: opacity 0.5s ease;
+            white-space: nowrap;
+            z-index: 5;
+            text-transform: uppercase;
+        }
+
+        .guidance.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        audio {
+            display: none;
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @media (min-height: 860px) {
+            .container {
+                padding-top: 11vh;
+            }
+            .vinyl-wrapper {
+                width: 310px;
+                height: 310px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .vinyl-wrapper {
+                width: 260px;
+                height: 260px;
+            }
+            .tagline {
+                font-size: 1.18rem;
+            }
+        }
+
+        /* Entrance */
+        .container > * {
+            opacity: 0;
+            transform: translateY(18px);
+            animation: riseIn 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        .vinyl-section { animation-delay: 0.15s; }
+        .tagline { animation-delay: 0.35s; }
+        .sub-tagline { animation-delay: 0.45s; }
+        .divider { animation-delay: 0.55s; }
+        .links { animation-delay: 0.65s; }
+        .footer { animation-delay: 0.85s; }
+
+        @keyframes riseIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-layer"></div>
+    <div class="bg-texture"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+    <div class="ambient-glow" id="ambientGlow"></div>
+
+    <div class="container">
+        <div class="vinyl-section">
+            <div class="vinyl-wrapper">
+                <div class="vinyl-glow" id="vinylGlow"></div>
+                <div class="vinyl-shadow"></div>
+
+                <div class="vinyl-container" id="vinylContainer">
+                    <img src="assets/vinyl-record.png" alt="Vinyl Record" class="vinyl-record" draggable="false" />
+                    <div class="vinyl-shine"></div>
+                    <div class="vinyl-center-glow" id="centerGlow"></div>
+                </div>
+
+                <div class="vinyl-click-area" id="vinylClick"></div>
+
+                <div class="tonearm-assembly" id="tonearmClick">
+                    <div class="tonearm-base"></div>
+                    <div class="tonearm" id="tonearm">
+                        <div class="tonearm-head"></div>
+                    </div>
+                    <div class="counterweight"></div>
+                    <div class="tonearm-rest"></div>
+                </div>
+
+                <div class="guidance" id="guidance">tap vinyl to play</div>
+                <div class="now-playing" id="nowPlaying"></div>
+            </div>
+        </div>
+
+        <div class="tagline">i write code & collect music.</div>
+        <div class="sub-tagline">for priya, always</div>
+
+        <div class="divider"></div>
+
+        <div class="links">
+            <a href="https://instagram.com" class="link" target="_blank" rel="noopener">instagram</a>
+            <a href="https://open.spotify.com" class="link" target="_blank" rel="noopener">spotify</a>
+            <a href="mailto:hello@example.com" class="link">mail</a>
+        </div>
+
+        <div class="footer">
+            <span class="footer-ornament">✦</span>
+            <span class="animated-footer-text" id="footerText">i love priya more than myself</span>
+            <span class="footer-ornament">✦</span>
+        </div>
+    </div>
+
+    <audio id="audioPlayer" preload="auto"></audio>
+
+    <script>
+        // ============================================================
+        //  Data
+        // ============================================================
+        const languageVariations = [
+            { text: "i love priya more than myself" },
+            { text: "मैं प्रिया से खुद से ज्यादा प्यार करता हूँ" },
+            { text: "أحبك يا بريا أكثر من نفسي" },
+            { text: "je t'aime priya plus que moi-même" },
+            { text: "te quiero priya más que a mí mismo" },
+            { text: "priya, you are my favorite song" },
+            { text: "धीरे-धीरे गढ़ा गया" },
+            { text: "crafted slowly, for you" }
+        ];
+
+        let tracks = [];
+        let currentTrackIndex = 0;
+        let isPlaying = false;
+        let isFirstTap = true;
+        let isTransitioning = false;
+        let currentLangIndex = 0;
+        let animationInterval = null;
+        let carouselStarted = false;
+
+        // ============================================================
+        //  DOM
+        // ============================================================
+        const vinylContainer = document.getElementById('vinylContainer');
+        const tonearm = document.getElementById('tonearm');
+        const vinylClick = document.getElementById('vinylClick');
+        const tonearmClick = document.getElementById('tonearmClick');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const nowPlaying = document.getElementById('nowPlaying');
+        const guidance = document.getElementById('guidance');
+        const footerTextSpan = document.getElementById('footerText');
+        const vinylGlow = document.getElementById('vinylGlow');
+        const centerGlow = document.getElementById('centerGlow');
+        const ambientGlow = document.getElementById('ambientGlow');
+
+        // ============================================================
+        //  Load tracks
+        // ============================================================
+        async function loadTracks() {
+            try {
+                const res = await fetch('songs/songs.json');
+                const data = await res.json();
+                tracks = data.tracks || [];
+            } catch (e) {
+                tracks = [
+                    { filename: 'song1.mp3', title: 'Track One' },
+                    { filename: 'song2.mp3', title: 'Track Two' },
+                    { filename: 'song3.mp3', title: 'Track Three' }
+                ];
+            }
+        }
+
+        // ============================================================
+        //  Playback
+        // ============================================================
+        function playTrack(index) {
+            if (!tracks.length) return;
+
+            currentTrackIndex = index % tracks.length;
+            const track = tracks[currentTrackIndex];
+
+            audioPlayer.src = `songs/${track.filename}`;
+            audioPlayer.play().catch(() => {});
+
+            isPlaying = true;
+            vinylContainer.classList.add('spinning');
+            tonearm.classList.add('playing');
+            vinylGlow.classList.add('active');
+            centerGlow.classList.add('active');
+            ambientGlow.classList.add('playing');
+
+            nowPlaying.textContent = track.title || 'Now Playing';
+            nowPlaying.classList.add('visible');
+            guidance.classList.add('hidden');
+        }
+
+        function pauseTrack() {
+            audioPlayer.pause();
+            isPlaying = false;
+            vinylContainer.classList.remove('spinning');
+            tonearm.classList.remove('playing');
+            vinylGlow.classList.remove('active');
+            centerGlow.classList.remove('active');
+            ambientGlow.classList.remove('playing');
+            nowPlaying.classList.remove('visible');
+        }
+
+        function togglePlayback() {
+            if (isFirstTap) {
+                isFirstTap = false;
+                guidance.classList.add('hidden');
+            }
+
+            if (isPlaying) {
+                pauseTrack();
+            } else {
+                if (!audioPlayer.src || audioPlayer.ended) {
+                    playTrack(currentTrackIndex);
+                } else {
+                    audioPlayer.play().catch(() => {});
+                    isPlaying = true;
+                    vinylContainer.classList.add('spinning');
+                    tonearm.classList.add('playing');
+                    vinylGlow.classList.add('active');
+                    centerGlow.classList.add('active');
+                    ambientGlow.classList.add('playing');
+                    nowPlaying.classList.add('visible');
+                }
+            }
+        }
+
+        function nextTrack() {
+            if (isFirstTap) {
+                isFirstTap = false;
+                guidance.classList.add('hidden');
+            }
+            playTrack(currentTrackIndex + 1);
+        }
+
+        // ============================================================
+        //  Multilingual carousel
+        // ============================================================
+        function updateFooterTextWithAnimation() {
+            if (isTransitioning) return;
+            isTransitioning = true;
+
+            footerTextSpan.classList.remove('fade-in');
+            footerTextSpan.classList.add('fade-out');
+
+            setTimeout(() => {
+                currentLangIndex = (currentLangIndex + 1) % languageVariations.length;
+                footerTextSpan.textContent = languageVariations[currentLangIndex].text;
+
+                footerTextSpan.classList.remove('fade-out');
+                footerTextSpan.classList.add('fade-in');
+
+                setTimeout(() => {
+                    isTransitioning = false;
+                }, 700);
+            }, 520);
+        }
+
+        function startMultilingualCarousel() {
+            if (animationInterval) clearInterval(animationInterval);
+            currentLangIndex = 0;
+            footerTextSpan.textContent = languageVariations[0].text;
+            footerTextSpan.classList.remove('fade-out');
+            footerTextSpan.classList.add('fade-in');
+
+            carouselStarted = true;
+            animationInterval = setInterval(updateFooterTextWithAnimation, 4300);
+        }
+
+        // ============================================================
+        //  Events
+        // ============================================================
+        audioPlayer.addEventListener('ended', () => {
+            isPlaying = false;
+            vinylContainer.classList.remove('spinning');
+            tonearm.classList.remove('playing');
+            vinylGlow.classList.remove('active');
+            centerGlow.classList.remove('active');
+            ambientGlow.classList.remove('playing');
+            nowPlaying.classList.remove('visible');
+            setTimeout(() => playTrack(currentTrackIndex + 1), 900);
+        });
+
+        audioPlayer.addEventListener('error', () => {});
+
+        vinylClick.addEventListener('click', togglePlayback);
+        tonearmClick.addEventListener('click', nextTrack);
+
+        vinylClick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            togglePlayback();
+        }, { passive: false });
+
+        tonearmClick.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            nextTrack();
+        }, { passive: false });
+
+        // ============================================================
+        //  Init
+        // ============================================================
+        loadTracks();
+
+        footerTextSpan.textContent = 'i love priya more than myself';
+        footerTextSpan.classList.add('fade-in');
+
+        setTimeout(() => {
+            startMultilingualCarousel();
+        }, 2200);
+
+        setTimeout(() => {
+            if (!carouselStarted) startMultilingualCarousel();
+        }, 2800);
+    </script>
+</body>
+</html>
