@@ -321,7 +321,10 @@
             border-radius: 50%;
             object-fit: cover;
             display: block;
-            transform: scale(1.142);
+            /* The source image is already a square, centered record. Do not
+               enlarge it: scaling here made the artwork's physical center
+               drift relative to the HTML spindle. */
+            transform: scale(1);
             filter: brightness(1.03) contrast(1.06) saturate(0.84) sepia(0.07);
         }
 
@@ -365,7 +368,9 @@
             letter-spacing: 0.4em;
             color: rgba(255, 240, 218, 0.15);
             text-shadow: 0 0.05em 0.08em rgba(0, 0, 0, 0.75);
-            transform: translate(-50%, -50%) rotate(-118deg) translateY(-21.6%) rotate(118deg) rotate(-13deg);
+            /* Keep the name on the label but safely outside the spindle
+               opening. It rotates with the vinyl, just like a printed label. */
+            transform: translate(-50%, -50%) translateY(-30%) rotate(-13deg);
             white-space: nowrap;
             pointer-events: none;
             user-select: none;
@@ -480,7 +485,7 @@
             height: 56em;
             transform-origin: 50% 0;
             transform: rotate(calc(var(--arm-deg) * 1deg));
-            transition: transform 980ms var(--ease-inout);
+            transition: transform 1100ms cubic-bezier(0.32, 0.72, 0, 1);
         }
 
         .arm-tube {
@@ -541,6 +546,23 @@
             background: linear-gradient(180deg, var(--accent) 0%, #7c6647 100%);
         }
 
+
+
+        /* The stylus is almost motionless in reality. This tiny, irregular
+           movement is deliberately subtle: enough to read as a tracking
+           stylus, never enough to look like a bouncing animation. */
+        .tonearm-assembly.needle-down .arm-head::after {
+            animation: stylusTrack 0.115s steps(2, end) infinite;
+            transform-origin: 50% 0;
+        }
+
+        @keyframes stylusTrack {
+            0%, 100% { transform: translateX(-50%) translateY(0) rotate(0deg); }
+            25% { transform: translateX(calc(-50% + 0.08em)) translateY(0.018em) rotate(0.45deg); }
+            50% { transform: translateX(calc(-50% - 0.05em)) translateY(-0.012em) rotate(-0.25deg); }
+            75% { transform: translateX(calc(-50% + 0.03em)) translateY(0.01em) rotate(0.2deg); }
+        }
+
         .arm-rest {
             position: absolute;
             left: 116%;
@@ -576,7 +598,7 @@
             height: 56em;
             transform-origin: 50% 0;
             transform: rotate(calc(var(--arm-deg) * 1deg));
-            transition: transform 980ms var(--ease-inout);
+            transition: transform 1100ms cubic-bezier(0.32, 0.72, 0, 1);
             background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.5), transparent);
             filter: blur(0.55em);
             opacity: 0.75;
@@ -1055,6 +1077,7 @@
             const recordSpin = document.getElementById('recordSpin');
             const arm = document.getElementById('arm');
             const armShadow = document.getElementById('armShadow');
+            const tonearmAssembly = document.getElementById('tonearmAssembly');
             const audioPlayer = document.getElementById('audioPlayer');
             const trackBox = document.getElementById('track');
             const trackTitle = document.getElementById('trackTitle');
@@ -1074,11 +1097,6 @@
             let isPlaying = false;
             let hasInteracted = false;
             let armHintShown = false;
-
-            const ARM_PARK = -24;      // resting on the post
-            const ARM_DROP = 5;        // needle on the outer groove
-            const ARM_INNER = 11.5;    // drifts inward as the side plays
-            const ARM_CUE = -13;       // lifted between tracks
 
             /* ------------------------------------------------------------
                tracks — songs/songs.json, unchanged structure
@@ -1124,25 +1142,13 @@
                 setTrack(Math.floor(Math.random() * tracks.length));
             }
 
-            function playNextTrack() {
-                if (tracks.length === 0) return;
-                let next;
-                do {
-                    next = Math.floor(Math.random() * tracks.length);
-                } while (tracks.length > 1 && next === currentTrackIndex);
-
-                cueArm();
-                setTrack(next);
-
-                audioPlayer.play().then(function () {
-                    onPlaying();
-                }).catch(function () { });
-            }
-
             /* ------------------------------------------------------------
-               rotation — real inertia, holds its angle when stopped
+               rotation — true 33⅓ RPM, with a physical-feeling ramp
             ------------------------------------------------------------ */
-            const RPM = 200 / 60;              // 33⅓ rpm, in degrees per ms
+            // 33⅓ RPM = 200 degrees/sec = 0.2 degrees/ms.
+            const RPM = 200 / 1000;
+            const SPIN_UP_TAU = 760;
+            const SPIN_DOWN_TAU = 980;
             let angle = Math.random() * 360;
             let velocity = 0;
             let targetVelocity = 0;
@@ -1150,20 +1156,25 @@
             let rafId = null;
 
             function applyAngle() {
-                recordSpin.style.transform = 'rotate(' + angle.toFixed(2) + 'deg)';
+                recordSpin.style.transform = 'rotate(' + angle.toFixed(3) + 'deg)';
             }
 
             function frame(now) {
                 const dt = Math.min(now - lastFrame, 50);
                 lastFrame = now;
 
-                const tau = targetVelocity > velocity ? 620 : 620; // spin-up / spin-down
-                velocity += (targetVelocity - velocity) * (1 - Math.exp(-dt / tau));
+                const tau = targetVelocity === 0 ? SPIN_DOWN_TAU : SPIN_UP_TAU;
+                const blend = 1 - Math.exp(-dt / tau);
+                velocity += (targetVelocity - velocity) * blend;
+
+                // Never overshoot the commanded platter speed.
+                if (targetVelocity > 0 && velocity > targetVelocity) velocity = targetVelocity;
+                if (targetVelocity === 0 && velocity < 0.01) velocity = 0;
+
                 angle = (angle + velocity * dt) % 360;
                 applyAngle();
 
-                if (targetVelocity === 0 && velocity < 0.02) {
-                    velocity = 0;
+                if (targetVelocity === 0 && velocity === 0) {
                     rafId = null;
                     return;
                 }
@@ -1181,25 +1192,166 @@
             applyAngle();
 
             /* ------------------------------------------------------------
-               tonearm
+               tonearm — a real sequence: lift -> cue -> lower -> track
             ------------------------------------------------------------ */
+            const ARM_PARK = -24;
+            const ARM_CUE = -13;
+            const ARM_DROP = 5;
+            const ARM_INNER = 11.5;
+            const ARM_LIFT = 26;
+            const ARM_TRACK_LIFT = 16;
+            const ARM_PARK_LIFT = 12;
+
+            let armSequenceTimer = null;
+            let armTrackingRAF = null;
+            let armMode = 'parked';
+            let queuedPlay = false;
+            let armTrackingStart = 0;
+            let armTrackingDuration = 0;
+
             function setArm(deg, lift) {
                 root.style.setProperty('--arm-deg', String(deg));
                 root.style.setProperty('--arm-lift', lift + 'px');
             }
 
+            function setNeedleDown(on) {
+                tonearmAssembly.classList.toggle('needle-down', !!on);
+            }
+
+            function clearArmSequence() {
+                if (armSequenceTimer) {
+                    clearTimeout(armSequenceTimer);
+                    armSequenceTimer = null;
+                }
+            }
+
+            function stopArmTracking() {
+                if (armTrackingRAF !== null) {
+                    cancelAnimationFrame(armTrackingRAF);
+                    armTrackingRAF = null;
+                }
+            }
+
             function cueArm() {
-                setArm(ARM_CUE, 26);
+                clearArmSequence();
+                stopArmTracking();
+                setNeedleDown(false);
+                setArm(ARM_CUE, ARM_LIFT);
+                armMode = 'cue';
             }
 
             function restArm() {
-                setArm(ARM_PARK, 12);
+                clearArmSequence();
+                stopArmTracking();
+                setNeedleDown(false);
+                setArm(ARM_PARK, ARM_PARK_LIFT);
+                armMode = 'parked';
             }
 
-            function trackArm() {
+            function trackArmImmediate() {
                 const d = audioPlayer.duration;
                 const p = (d && isFinite(d) && d > 0) ? Math.min(audioPlayer.currentTime / d, 1) : 0;
-                setArm(ARM_DROP + (ARM_INNER - ARM_DROP) * p, 16);
+                setArm(ARM_DROP + (ARM_INNER - ARM_DROP) * p, ARM_TRACK_LIFT);
+            }
+
+            function trackArmSmooth() {
+                stopArmTracking();
+                if (!isPlaying || armMode !== 'playing') return;
+
+                const d = audioPlayer.duration;
+                if (!d || !isFinite(d) || d <= 0) {
+                    trackArmImmediate();
+                    return;
+                }
+
+                // A physical tonearm moves continuously but extremely slowly.
+                // We update it per frame so it never jumps on timeupdate events.
+                const p = Math.min(audioPlayer.currentTime / d, 1);
+                const eased = p * p * (3 - 2 * p);
+                setArm(ARM_DROP + (ARM_INNER - ARM_DROP) * eased, ARM_TRACK_LIFT);
+
+                armTrackingRAF = requestAnimationFrame(trackArmSmooth);
+            }
+
+            function lowerNeedleAndStartAudio() {
+                if (!queuedPlay || armMode !== 'cue') return;
+
+                queuedPlay = false;
+                armMode = 'lowering';
+                setArm(ARM_DROP, ARM_TRACK_LIFT);
+
+                // Let the arm visibly settle onto the lead-in groove before
+                // the first audible sample is allowed to play.
+                armSequenceTimer = setTimeout(function () {
+                    armSequenceTimer = null;
+                    if (armMode !== 'lowering') return;
+                    setNeedleDown(true);
+                    armMode = 'playing';
+
+                    audioPlayer.play().then(function () {
+                        onPlaying();
+                        trackArmSmooth();
+                    }).catch(function () {
+                        restArm();
+                    });
+                }, 1050);
+            }
+
+            function startPlaybackSequence() {
+                if (!currentTrack) return;
+                clearArmSequence();
+                stopArmTracking();
+                queuedPlay = true;
+                setNeedleDown(false);
+
+                // The platter motor starts first and ramps naturally to 33⅓.
+                // The arm is moved at the same time, but audio waits for landing.
+                spin(true);
+                setArm(ARM_CUE, ARM_LIFT);
+                armMode = 'cue';
+
+                armSequenceTimer = setTimeout(function () {
+                    armSequenceTimer = null;
+                    lowerNeedleAndStartAudio();
+                }, 1250);
+            }
+
+            function pauseMechanically() {
+                clearArmSequence();
+                stopArmTracking();
+                queuedPlay = false;
+                audioPlayer.pause();
+                setNeedleDown(false);
+                armMode = 'paused';
+                // A real pause lifts the stylus and leaves it at the groove.
+                setArm(parseFloat(getComputedStyle(root).getPropertyValue('--arm-deg')) || ARM_DROP, 25);
+                spin(false);
+                isPlaying = false;
+                body.classList.remove('playing');
+                root.style.setProperty('--scene', '1');
+                hitRecord.setAttribute('aria-pressed', 'false');
+            }
+
+            function resumePlaybackSequence() {
+                const d = audioPlayer.duration;
+                const p = (d && isFinite(d) && d > 0) ? Math.min(audioPlayer.currentTime / d, 1) : 0;
+                const deg = ARM_DROP + (ARM_INNER - ARM_DROP) * p;
+
+                setNeedleDown(false);
+                setArm(deg, ARM_TRACK_LIFT + 9);
+                armMode = 'lowering';
+                spin(true);
+
+                armSequenceTimer = setTimeout(function () {
+                    armSequenceTimer = null;
+                    setArm(deg, ARM_TRACK_LIFT);
+                    setNeedleDown(true);
+                    armMode = 'playing';
+                    audioPlayer.play().then(function () {
+                        onPlaying();
+                        trackArmSmooth();
+                    }).catch(function () { restArm(); });
+                }, 850);
             }
 
             /* ------------------------------------------------------------
@@ -1212,33 +1364,30 @@
                 hitRecord.setAttribute('aria-pressed', 'true');
                 trackBox.classList.add('show');
                 spin(true);
-                trackArm();
                 scheduleArmHint();
             }
 
             function onStopped() {
-                isPlaying = false;
-                body.classList.remove('playing');
-                root.style.setProperty('--scene', '1');
-                hitRecord.setAttribute('aria-pressed', 'false');
-                spin(false);
-                restArm();
-                unscheduleArmHint();
+                pauseMechanically();
             }
 
             function playMusic() {
-                audioPlayer.play().then(onPlaying).catch(function () { });
+                if (!currentTrack) return;
+                if (audioPlayer.currentTime > 0 && !audioPlayer.ended) resumePlaybackSequence();
+                else startPlaybackSequence();
             }
 
             function pauseMusic() {
-                audioPlayer.pause();
-                onStopped();
+                pauseMechanically();
             }
 
             function togglePlayback() {
                 firstTouch();
-                if (isPlaying) pauseMusic();
-                else playMusic();
+                if (isPlaying || armMode === 'lowering' || armMode === 'cue') {
+                    pauseMusic();
+                } else {
+                    playMusic();
+                }
             }
 
             function nextTrack() {
@@ -1254,23 +1403,45 @@
                 const d = audioPlayer.duration;
                 if (d && isFinite(d) && d > 0) {
                     setProgress(Math.min(audioPlayer.currentTime / d, 1));
-                    if (isPlaying) trackArm();
                 }
             });
 
             audioPlayer.addEventListener('ended', function () {
+                clearArmSequence();
+                stopArmTracking();
                 isPlaying = false;
                 body.classList.remove('playing');
+                setNeedleDown(false);
+                armMode = 'cue';
                 spin(false);
                 cueArm();
-                setTimeout(function () { playNextTrack(); }, 1100);
+                setTimeout(function () { playNextTrack(); }, 900);
             });
 
             audioPlayer.addEventListener('pause', function () {
-                if (isPlaying && !audioPlayer.ended) onStopped();
+                // The pause() call is handled explicitly by pauseMechanically.
+                // Do not let the browser's pause event teleport the arm.
             });
 
             audioPlayer.addEventListener('error', function () { });
+
+            /* ------------------------------------------------------------
+               next track — same physical cue/land sequence
+            ------------------------------------------------------------ */
+            function playNextTrack() {
+                if (tracks.length === 0) return;
+                let next;
+                do {
+                    next = Math.floor(Math.random() * tracks.length);
+                } while (tracks.length > 1 && next === currentTrackIndex);
+
+                clearArmSequence();
+                stopArmTracking();
+                setNeedleDown(false);
+                cueArm();
+                setTrack(next);
+                startPlaybackSequence();
+            }
 
             /* ------------------------------------------------------------
                hints — appear quietly, then get out of the way
