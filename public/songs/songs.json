@@ -1,16 +1,7 @@
 {
   "tracks": [
-    {
-      "filename": "Hoor.mp3",
-      "title": "Hoor"
-    },
-    {
-      "filename": "Tu.mp3",
-      "title": "Tu"
-    },
-    {
-      "filename": "Safar.mp3",
-      "title": "Safar"
-    }
+    { "filename": "song1.m4a", "title": "Hoor", "artist": "Sama, Starboy X", "duration": 158 },
+    { "filename": "song2.mp3", "title": "Tu", "artist": "Talwiinder", "duration": 132 },
+    { "filename": "song3.m4a", "title": "Safar", "artist": "Juss × MixSingh", "duration": 197 }
   ]
 }

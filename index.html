@@ -3,89 +3,139 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#080705">
-  <meta name="description" content="A tactile digital record deck — write code & collect music.">
-  <meta property="og:title" content="Record deck">
-  <meta property="og:description" content="A cinematic, tactile record player experience.">
+  <meta name="theme-color" content="#15110e">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="write code & collect music.">
+  <meta property="og:title" content="mentallyfuckedup">
+  <meta property="og:description" content="write code & collect music.">
   <meta property="og:type" content="website">
-  <title>Record deck</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23080705'/%3E%3Ccircle cx='16' cy='16' r='13' fill='%23131210'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%233a332b'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e6d8bd'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Crimson+Text:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="src/styles.css">
+  <title>mentallyfuckedup</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/lora-italic.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="/assets/walnut.jpg" as="image">
+  <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
-  <div class="environment" aria-hidden="true">
-    <div class="environment__texture"></div>
-    <div class="environment__lamp"></div>
-    <div class="environment__surface"></div>
-  </div>
+  <main class="stage">
+    <div class="deck-fit" id="deckFit">
+      <div class="deck" id="deck">
+        <div class="plinth" aria-hidden="true"></div>
+        <div class="well" aria-hidden="true"></div>
 
-  <main class="site-shell">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero__eyebrow">a small machine for listening</div>
-      <div class="hero__scene" id="sceneWrap">
-        <p class="interaction-hint show" id="interactionHint" aria-live="polite">tap the vinyl to play</p>
-        <canvas id="webgl" tabindex="0" role="img" aria-label="Interactive three-dimensional vinyl record player"></canvas>
-        <div class="scene-fallback" id="sceneFallback" aria-hidden="true">
-          <img src="/assets/vinyl-record.png" alt="" draggable="false">
-          <svg class="fallback-tonearm" viewBox="0 0 100 100" role="presentation" aria-hidden="true">
-            <defs>
-              <linearGradient id="tonearmMetal" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stop-color="#4e4539"/><stop offset=".28" stop-color="#e1d2b9"/><stop offset=".55" stop-color="#857866"/><stop offset=".78" stop-color="#d5c5ac"/><stop offset="1" stop-color="#393128"/>
-              </linearGradient>
-              <radialGradient id="pivotMetal"><stop offset="0" stop-color="#c9b99e"/><stop offset=".5" stop-color="#6c6050"/><stop offset="1" stop-color="#211c17"/></radialGradient>
-            </defs>
-            <circle cx="84" cy="27" r="6.5" fill="#181512" stroke="#857761" stroke-width="1.2"/>
-            <circle cx="84" cy="27" r="3.5" fill="url(#pivotMetal)" stroke="#c8b79b" stroke-width=".45"/>
-            <path d="M82 31 L68 46" stroke="#100e0b" stroke-width="4.2" stroke-linecap="round"/>
-            <path d="M82 31 L68 46" stroke="url(#tonearmMetal)" stroke-width="2.2" stroke-linecap="round"/>
-            <path d="M81 32 L67 46" stroke="#e6d9c3" stroke-opacity=".6" stroke-width=".45"/>
-            <path d="M66 44 L70 47 L68 50 L64 47 Z" fill="#4a4033" stroke="#c2b092" stroke-width=".55"/>
-            <path d="M66.5 48 L65.8 50.4" stroke="#eadfc9" stroke-width=".65" stroke-linecap="round"/>
-            <circle cx="65.8" cy="50.4" r=".55" fill="#f0e3c9"/>
+        <div class="platter" aria-hidden="true">
+          <div class="spin" id="spin">
+            <div class="strobe"></div>
+            <div class="record" id="record">
+              <img class="grooves" src="/assets/grooves.webp" alt="" draggable="false" width="1400" height="1400">
+              <div class="label"></div>
+            </div>
+          </div>
+        </div>
+        <div class="sheen" aria-hidden="true"></div>
+        <div class="spindle" aria-hidden="true"></div>
+
+        <div class="arm-base" aria-hidden="true"></div>
+        <svg class="arm-svg" viewBox="0 0 1120 884" aria-hidden="true" focusable="false">
+          <defs>
+            <linearGradient id="gTube" gradientUnits="userSpaceOnUse" x1="0" y1="-8" x2="0" y2="8">
+              <stop offset="0" stop-color="#4a4844"/>
+              <stop offset=".3" stop-color="#efebe1"/>
+              <stop offset=".55" stop-color="#aeaaa0"/>
+              <stop offset="1" stop-color="#3f3d39"/>
+            </linearGradient>
+            <linearGradient id="gWeight" gradientUnits="userSpaceOnUse" x1="0" y1="-22" x2="0" y2="22">
+              <stop offset="0" stop-color="#1b1a18"/>
+              <stop offset=".28" stop-color="#4d4a45"/>
+              <stop offset=".5" stop-color="#2a2825"/>
+              <stop offset="1" stop-color="#141311"/>
+            </linearGradient>
+            <radialGradient id="gCap" cx=".34" cy=".3" r=".85">
+              <stop offset="0" stop-color="#f4f0e6"/>
+              <stop offset=".45" stop-color="#a9a59b"/>
+              <stop offset="1" stop-color="#4a4843"/>
+            </radialGradient>
+            <filter id="fShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur id="shadowBlur" stdDeviation="3"/>
+            </filter>
+            <g id="armSil">
+              <path d="M-46 -6.5 L505 -4.6 L505 4.6 L-46 6.5 Z"/>
+              <rect x="-124" y="-22" width="66" height="44" rx="8"/>
+              <g transform="translate(522 0) rotate(14)">
+                <rect x="0" y="-9" width="66" height="18" rx="3"/>
+                <rect x="22" y="-12" width="38" height="24" rx="2"/>
+              </g>
+              <circle r="17"/>
+            </g>
+          </defs>
+
+          <g id="restPost"></g>
+          <g id="armShadow" fill="#000" opacity=".5" filter="url(#fShadow)"><use href="#armSil"/></g>
+          <g id="arm">
+            <rect x="-62" y="-4" width="20" height="8" rx="2" fill="url(#gTube)"/>
+            <rect x="-124" y="-22" width="66" height="44" rx="8" fill="url(#gWeight)"/>
+            <path d="M-110 -22V22M-102 -22V22M-94 -22V22M-86 -22V22M-78 -22V22M-70 -22V22" stroke="#fff" stroke-opacity=".07" stroke-width="1.4"/>
+            <rect x="-124" y="-22" width="66" height="44" rx="8" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1"/>
+            <path d="M-46 -6.5 L505 -4.6 L505 4.6 L-46 6.5 Z" fill="url(#gTube)"/>
+            <rect x="497" y="-8.5" width="25" height="17" rx="3.5" fill="url(#gTube)"/>
+            <path d="M497 -3 H522 M497 3 H522" stroke="#000" stroke-opacity=".28" stroke-width=".9"/>
+            <g transform="translate(522 0) rotate(14)">
+              <rect x="0" y="-9" width="66" height="18" rx="3" fill="#1f1e1c"/>
+              <path d="M3 -8.4 H63" stroke="#fff" stroke-opacity=".16" stroke-width="1"/>
+              <path d="M14 -9 V-17.5 Q14 -19 15.5 -19 H25 Q26.5 -19 26.5 -17.5 V-9" fill="#2a2926"/>
+              <rect x="22" y="-12" width="38" height="24" rx="2" fill="#2b2926"/>
+              <rect x="22" y="-12" width="38" height="24" rx="2" fill="none" stroke="#fff" stroke-opacity=".12"/>
+              <rect x="50" y="-12" width="10" height="24" rx="1.6" fill="#b8925a"/>
+              <path d="M56.5 -2.2 L63.5 0 L56.5 2.2Z" fill="#e8d3a6"/>
+            </g>
+            <circle r="17" fill="url(#gCap)"/>
+            <circle r="17" fill="none" stroke="#000" stroke-opacity=".35"/>
+            <circle r="8.5" fill="#3b3935"/>
+            <circle r="8.5" fill="none" stroke="#fff" stroke-opacity=".2"/>
+            <circle cx="-2" cy="-2.4" r="2.6" fill="#fff" fill-opacity=".35"/>
+          </g>
+        </svg>
+
+        <div class="led" aria-hidden="true"></div>
+        <button class="start" id="startBtn" type="button" aria-label="Play">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path class="i-play" d="M8.2 5.6v12.8L18.6 12z"/>
+            <path class="i-pause" d="M8 5.6h3v12.8H8zM13 5.6h3v12.8h-3z"/>
           </svg>
-        </div>
-        <button class="hotspot hotspot--record" id="recordButton" type="button" aria-pressed="false" aria-label="Play or pause the record"></button>
-        <button class="hotspot hotspot--arm" id="armButton" type="button" aria-label="Play the next track"></button>
-      </div>
+        </button>
 
-      <div class="hero__copy">
-        <h1 id="hero-title"></h1>
-        <div class="title-rule" aria-hidden="true"></div>
-        <div class="now-playing" id="nowPlaying" aria-live="polite">
-          <span class="now-playing__title" id="trackTitle"></span>
-          <span class="now-playing__progress"><i id="trackProgress"></i></span>
-        </div>
-      </div>
-    </section>
+        <div class="light" aria-hidden="true"></div>
 
-    <footer class="footer">
-      <p class="tagline">{ write code &amp; collect music. }</p>
-      <nav class="links" aria-label="Elsewhere">
-        <a href="https://www.instagram.com/mentallyfuvkkedup/" target="_blank" rel="noopener noreferrer">instagram</a>
-        <span aria-hidden="true">|</span>
-        <a href="https://open.spotify.com/user/31pzqjv3mp74qojr6jvwkcgn4lvy" target="_blank" rel="noopener noreferrer">spotify</a>
-        <span aria-hidden="true">|</span>
-        <a href="mailto:sirrvetohere@gmail.com">mail</a>
-      </nav>
-      <p class="quiet"><span id="quietText">crafted slowly</span></p>
-      <p class="system-status" id="systemStatus" aria-live="polite"></p>
+        <button class="hit-record" id="recordHit" type="button" aria-label="Play"></button>
+        <div class="arm-hit" id="armHit" role="slider" tabindex="0" aria-label="Tonearm" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+      </div>
+    </div>
+
+    <footer class="caption">
+      <div class="now">
+        <button class="skip" id="prevBtn" type="button" aria-label="Previous track">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.5 6.5 9 12l5.5 5.5"/></svg>
+        </button>
+        <div class="meta" aria-live="polite">
+          <span class="title" id="title"></span>
+          <span class="artist" id="artist"></span>
+        </div>
+        <button class="skip" id="nextBtn" type="button" aria-label="Next track">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg>
+        </button>
+      </div>
+      <p class="hint" id="hint">tap the record</p>
+      <div class="foot">
+        <p class="tagline">{ write code &amp; collect music. }</p>
+        <nav class="links" aria-label="Elsewhere">
+          <a href="https://www.instagram.com/mentallyfuvkkedup/" target="_blank" rel="noopener noreferrer">instagram</a>
+          <a href="https://open.spotify.com/user/31pzqjv3mp74qojr6jvwkcgn4lvy" target="_blank" rel="noopener noreferrer">spotify</a>
+          <a href="mailto:sirrvetohere@gmail.com">mail</a>
+        </nav>
+      </div>
     </footer>
   </main>
 
-  <div class="vignette" aria-hidden="true"></div>
-  <div class="grain" aria-hidden="true"></div>
-  <audio id="audioPlayer" preload="metadata"></audio>
-
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
-    }
-  }
-  </script>
-  <script type="module" src="src/main.js"></script>
+  <audio id="audio" preload="metadata"></audio>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

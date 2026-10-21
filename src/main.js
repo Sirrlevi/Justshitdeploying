@@ -1,483 +1,381 @@
-import * as THREE from 'three';
+/* Record deck: one side of vinyl, three tracks, one tonearm.
+   Everything on the deck is laid out on a 1120 × 884 grid (see styles.css). */
 
 const $ = (s) => document.querySelector(s);
-const canvas = $('#webgl');
-const sceneWrap = $('#sceneWrap');
-const recordButton = $('#recordButton');
-const armButton = $('#armButton');
-const recordTitle = $('#trackTitle');
-const heroTitle = $('#hero-title');
-const progressEl = $('#trackProgress');
-const nowPlaying = $('#nowPlaying');
-const hint = $('#interactionHint');
-const audio = $('#audioPlayer');
-const status = $('#systemStatus');
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const wrapPi = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+const DEG = 180 / Math.PI;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
-const TRACK_FALLBACK = [
-  { filename: 'Hoor.mp3' },
-  { filename: 'Tu.mp3' },
-  { filename: 'Safar.mp3' }
-];
-let tracks = [];
-let currentIndex = -1;
-let currentTrack = null;
-let playing = false;
-let playQueued = false;
-let ignorePauseEventCount = 0;
+const el = {
+  deck: $('#deck'), spin: $('#spin'), record: $('#record'),
+  arm: $('#arm'), armShadow: $('#armShadow'), shadowBlur: $('#shadowBlur'), restPost: $('#restPost'),
+  armHit: $('#armHit'), recordHit: $('#recordHit'), start: $('#startBtn'),
+  prev: $('#prevBtn'), next: $('#nextBtn'),
+  meta: $('.meta'), title: $('#title'), artist: $('#artist'), hint: $('#hint'),
+  audio: $('#audio')
+};
 
-function setStatus(text=''){ status.textContent = text; }
-function titleFromFilename(filename=''){
-  return filename
-    .replace(/\.[^.]+$/, '')
-    .replace(/[_-]+/g, ' ')
-    .replace(/([a-z])([0-9])/gi, '$1 $2')
-    .replace(/\s+/g, ' ')
-    .trim() || 'untitled';
+/* ───────── geometry (design units) ───────── */
+const C = { x: 442, y: 442 };            // spindle
+const P = { x: 960, y: 190 };            // tonearm pivot
+const R_OUT = 338, R_IN = 135;           // first / last groove
+const R_STOP = 124;                      // innermost the needle may travel
+const R_REST = 424;                      // needle distance from spindle when parked
+const HEAD = 14 / DEG;                   // headshell offset angle
+const TIP = { x: 522 + 63.5 * Math.cos(HEAD), y: 63.5 * Math.sin(HEAD) };   // stylus in arm space
+const L = Math.hypot(TIP.x, TIP.y), TIP_ANGLE = Math.atan2(TIP.y, TIP.x);
+const D = Math.hypot(C.x - P.x, C.y - P.y), PSI = Math.atan2(C.y - P.y, C.x - P.x);
+
+// arm rotation (radians) that puts the stylus at distance d from the spindle
+const thetaForD = (d) => PSI - Math.acos(clamp((L * L + D * D - d * d) / (2 * L * D), -1, 1)) - TIP_ANGLE;
+const dForTheta = (t) => Math.sqrt(Math.max(0, L * L + D * D - 2 * L * D * Math.cos(PSI - (t + TIP_ANGLE))));
+const THETA_REST = thetaForD(R_REST), THETA_IN = thetaForD(R_STOP);
+const fForD = (d) => clamp((R_OUT - d) / (R_OUT - R_IN), 0, 1);
+const OMEGA = (Math.PI * 2 * 100) / 3 / 60;   // 33⅓ rpm
+
+/* ───────── state ───────── */
+const audio = el.audio;
+const state = {
+  tracks: [], dur: [], cum: [0], total: 1,
+  index: 0, playing: false, onRecord: false, wait: false
+};
+let cueToken = 0;
+let shownIndex = -1;
+
+const arm = { theta: THETA_REST, lift: 1 };
+let omega = 0, rot = 0;
+let drag = null;
+
+/* ───────── tracks ───────── */
+const FALLBACK = ['song1', 'song2', 'song3'].map((n, i) => ({ filename: `${n}.mp3`, title: `Track ${i + 1}` }));
+
+async function loadTracks() {
+  let list = null;
+  try {
+    const res = await fetch('/songs/songs.json', { cache: 'no-cache' });
+    if (res.ok) list = (await res.json()).tracks;
+  } catch { /* fall through */ }
+  if (!Array.isArray(list) || !list.length) list = FALLBACK;
+
+  state.tracks = list.map((t) => ({ url: `/songs/${t.filename}`, title: t.title || '', artist: t.artist || '' }));
+  state.dur = list.map((t) => (Number(t.duration) > 0 ? Number(t.duration) : 0));
+  relayout();
+  load(0);
+  state.dur.forEach((d, i) => { if (!d) probeDuration(i); });
 }
-function mapTracks(list){
-  return list
-    .filter(t => typeof t.filename === 'string' && /\.mp3$/i.test(t.filename))
-    .map(t => ({
-      url: `/songs/${encodeURIComponent(t.filename)}`,
-      title: titleFromFilename(t.filename),
-      filename: t.filename
-    }));
+
+function probeDuration(i) {
+  const a = new Audio();
+  a.preload = 'metadata';
+  a.addEventListener('loadedmetadata', () => {
+    if (Number.isFinite(a.duration)) { state.dur[i] = a.duration; relayout(); }
+  }, { once: true });
+  a.src = state.tracks[i].url;
 }
-async function loadTracks(){
-  try{
-    const res = await fetch('/songs/songs.json', { cache: 'no-store' });
-    if(!res.ok) throw new Error('track manifest unavailable');
-    const data = await res.json();
-    tracks = mapTracks(Array.isArray(data.tracks) ? data.tracks : []);
-  }catch{
-    tracks = mapTracks(TRACK_FALLBACK);
+
+function relayout() {
+  const known = state.dur.filter(Boolean);
+  const fill = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
+  const d = state.dur.map((v) => v || fill);
+  state.cum = [0];
+  d.forEach((v) => state.cum.push(state.cum[state.cum.length - 1] + v));
+  state.total = state.cum[state.cum.length - 1] || 1;
+  state.span = d;
+  buildGaps();
+}
+
+function buildGaps() {
+  el.record.querySelectorAll('.gap').forEach((n) => n.remove());
+  const label = el.record.querySelector('.label');
+  for (let i = 1; i < state.tracks.length; i++) {
+    const r = R_OUT - (state.cum[i] / state.total) * (R_OUT - R_IN);
+    const ring = document.createElement('div');
+    ring.className = 'gap';
+    ring.style.setProperty('--r', r.toFixed(2));
+    el.record.insertBefore(ring, label);
   }
-  if(!tracks.length) tracks = mapTracks(TRACK_FALLBACK);
-  // Start consistently with the first filename-sorted track.
-  selectTrack(0);
 }
-function selectTrack(index, {preservePlayback=false}={}){
-  if(!tracks.length) return;
-  currentIndex = (index + tracks.length) % tracks.length;
-  currentTrack = tracks[currentIndex];
-  // Loading a replacement source pauses the current media element. Suppress that one
-  // pause event when this is a seamless track change so it cannot park the arm.
-  if(preservePlayback && !audio.paused && !audio.ended) ignorePauseEventCount++;
+
+const fAt = (index, t) => clamp((state.cum[index] + t) / state.total, 0, 1);
+function locate(f) {
+  const time = f * state.total;
+  let i = state.tracks.findIndex((_, k) => time < state.cum[k + 1]);
+  if (i < 0) i = state.tracks.length - 1;
+  return { index: i, time: clamp(time - state.cum[i], 0, Math.max(0, state.span[i] - 0.25)) };
+}
+
+function load(index) {
+  state.index = index;
+  audio.src = state.tracks[index].url;
+  setMeta(index, true);
+}
+
+function setMeta(index, instant) {
+  if (index === shownIndex) return;
+  shownIndex = index;
+  const t = state.tracks[index];
+  const write = () => {
+    el.title.textContent = t.title;
+    el.artist.textContent = t.artist;
+    el.artist.hidden = !t.artist;
+    el.meta.classList.remove('swap');
+  };
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist });
+  }
+  if (instant || reduceMotion.matches) return write();
+  el.meta.classList.add('swap');
+  setTimeout(() => { if (shownIndex === index) write(); }, 200);
+}
+
+/* ───────── transport ───────── */
+function syncUI() {
+  document.body.classList.toggle('playing', state.playing);
+  const label = state.playing ? 'Pause' : 'Play';
+  el.recordHit.setAttribute('aria-label', label);
+  el.start.setAttribute('aria-label', label);
+  if (!drag) setMeta(state.index);
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state.playing ? 'playing' : 'paused';
+}
+
+function startAt(index, time) {
+  const token = ++cueToken;
+  state.wait = false;
+  if (index !== state.index || !audio.getAttribute('src')) load(index);
+  try { audio.currentTime = time; } catch { /* metadata not ready yet; browser keeps it as start position */ }
+  state.onRecord = true;
+  state.playing = true;
+  syncUI();
+  seenHint();
+  const p = audio.play();
+  if (p) p.catch(() => { if (token === cueToken) { state.playing = false; syncUI(); } });
+}
+
+function pause() {
+  cueToken++;
+  state.wait = false;
   audio.pause();
-  audio.src = currentTrack.url;
-  audio.load();
-  updateTrackUI();
+  state.playing = false;
+  syncUI();
 }
 
-let renderer, scene, camera, record, recordTop, recordGrooves, tonearm, armNeedle, platter, deckGroup, keyLight;
-let recordGroup, recordHitZone, armHitProxy, armPivotProxy;
-let ready3D = false;
-let clock = new THREE.Clock();
-let raycaster = new THREE.Raycaster();
-let pointerNdc = new THREE.Vector2();
-let spinVelocity = 0;
-let spinTarget = 0;
-const ARM_PARK_ANGLE = 3.409; // calibrated so the stylus rests on the lower-right cradle, inside the plinth
-const ARM_REST_LIFT = .08;
-const ARM_CUE_LIFT = .2;
-const ARM_PLAY_START_ANGLE = 2.9;
-const ARM_PLAY_END_ANGLE = 2.64;
-let armTarget = ARM_PARK_ANGLE;
-let armCurrent = ARM_PARK_ANGLE;
-let armLiftTarget = ARM_REST_LIFT;
-let armLiftCurrent = ARM_REST_LIFT;
-let armSequence = 'parked';
-const RECORD_RPM = 33 + 1 / 3;
-const RECORD_ANGULAR_SPEED = RECORD_RPM * Math.PI * 2 / 60;
-let baseRecordRotation = Math.random() * Math.PI * 2;
-
-function mat(color, roughness=.45, metalness=.35){
-  return new THREE.MeshPhysicalMaterial({color,roughness,metalness,clearcoat:.35,clearcoatRoughness:.22});
-}
-function makeGrooves(){
-  const geo = new THREE.TorusGeometry(1.91, .005, 4, 160);
-  const m = new THREE.MeshBasicMaterial({color:0x777066,transparent:true,opacity:.075});
-  const group = new THREE.Group();
-  for(let i=0;i<18;i++){
-    const ring = new THREE.Mesh(geo,m);
-    ring.scale.setScalar(1 - i*.018);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = .005;
-    group.add(ring);
-  }
-  return group;
-}
-function makeProceduralVinylTexture(){
-  const size = 768;
-  const c = document.createElement('canvas'); c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(size*.34,size*.28,size*.03,size*.5,size*.5,size*.55);
-  g.addColorStop(0,'#242321'); g.addColorStop(.42,'#050505'); g.addColorStop(.82,'#11100f'); g.addColorStop(1,'#030303');
-  ctx.fillStyle=g; ctx.fillRect(0,0,size,size);
-  for(let r=size*.27;r<size*.49;r+=2){ctx.beginPath();ctx.arc(size/2,size/2,r,0,Math.PI*2);ctx.strokeStyle=`rgba(205,190,165,${.025+Math.random()*.025})`;ctx.lineWidth=1;ctx.stroke();}
-  ctx.beginPath();ctx.arc(size/2,size/2,size*.19,0,Math.PI*2);ctx.fillStyle='#e6d8bd';ctx.fill();
-  ctx.beginPath();ctx.arc(size/2,size/2,size*.018,0,Math.PI*2);ctx.fillStyle='#15120e';ctx.fill();
-  const t = new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
-}
-
-async function init3D(){
-  if(!canvas || !window.WebGLRenderingContext) throw new Error('WebGL unavailable');
-  renderer = new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-  scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x090705,.035);
-  camera = new THREE.PerspectiveCamera(34,1,.1,50);
-  camera.position.set(0,6.2,7.8);
-  camera.lookAt(0,.1,0);
-
-  scene.add(new THREE.HemisphereLight(0xdbc4a2,0x070604,1.3));
-  keyLight = new THREE.DirectionalLight(0xffdfb0,4.5);
-  keyLight.position.set(-3,7,4); keyLight.castShadow=true; keyLight.shadow.mapSize.set(1024,1024); keyLight.shadow.bias=-.0004; scene.add(keyLight);
-  const rim = new THREE.PointLight(0xa77d50,1.7,10); rim.position.set(4,2,-2); scene.add(rim);
-
-  deckGroup = new THREE.Group();
-  deckGroup.rotation.x = THREE.MathUtils.degToRad(8);
-  scene.add(deckGroup);
-
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(6.4,.48,5.15),mat(0x17100b,.5,.18));
-  deck.position.y=-.28; deck.castShadow=true; deck.receiveShadow=true; deckGroup.add(deck);
-  const wood = new THREE.Mesh(new THREE.BoxGeometry(6.1,.18,4.86),mat(0x3a281b,.62,.08));
-  wood.position.y=.02; wood.castShadow=true; deckGroup.add(wood);
-  const inlay = new THREE.Mesh(new THREE.BoxGeometry(5.86,.08,4.6),mat(0x0d0a07,.72,.03));
-  inlay.position.y=.12; inlay.receiveShadow=true; deckGroup.add(inlay);
-
-  platter = new THREE.Mesh(new THREE.CylinderGeometry(2.18,2.13,.16,96),mat(0x11100f,.26,.82));
-  platter.position.set(-.2,.23,0); platter.castShadow=true; platter.receiveShadow=true; deckGroup.add(platter);
-
-  // One shared transform keeps the disc, printed label, grooves, spindle and hit target concentric.
-  recordGroup = new THREE.Group();
-  recordGroup.position.set(-.2,0,0);
-  deckGroup.add(recordGroup);
-
-  const recordMat = new THREE.MeshPhysicalMaterial({color:0x0a0a09,roughness:.24,metalness:.42,clearcoat:1,clearcoatRoughness:.1});
-  record = new THREE.Mesh(new THREE.CylinderGeometry(2.04,2.015,.12,128),recordMat);
-  record.position.set(0,.35,0); record.castShadow=true; record.receiveShadow=true; recordGroup.add(record);
-
-  const loader = new THREE.TextureLoader();
-  let texture;
-  try { texture = await loader.loadAsync('/assets/vinyl-record.png'); }
-  catch { texture = makeProceduralVinylTexture(); }
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  recordTop = new THREE.Mesh(
-    new THREE.CircleGeometry(1.99,128),
-    new THREE.MeshPhysicalMaterial({map:texture,roughness:.31,metalness:.1,clearcoat:.62,clearcoatRoughness:.16})
-  );
-  recordTop.rotation.x = -Math.PI/2;
-  recordTop.position.set(0,.415,0);
-  recordTop.castShadow = true;
-  recordTop.receiveShadow = true;
-  recordGroup.add(recordTop);
-
-  recordGrooves = makeGrooves();
-  recordGrooves.position.set(0,.419,0);
-  recordGroup.add(recordGrooves);
-
-  // The real center hole is painted out of the label texture; this single short spindle sits exactly on-axis.
-  const spindle = new THREE.Mesh(
-    new THREE.CylinderGeometry(.018,.023,.038,32),
-    mat(0x807464,.24,.82)
-  );
-  spindle.position.set(0,.434,0);
-  spindle.castShadow = false;
-  recordGroup.add(spindle);
-
-  // Invisible, concentric hit plane: taps on the visible vinyl itself toggle playback.
-  recordHitZone = new THREE.Mesh(
-    new THREE.CircleGeometry(1.975,96),
-    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide})
-  );
-  recordHitZone.rotation.x = -Math.PI/2;
-  recordHitZone.position.set(0,.426,0);
-  recordHitZone.userData.deckInteraction = 'record';
-  recordGroup.add(recordHitZone);
-
-  // Tonearm assembly: explicitly placed over the platter with a visible metallic tube,
-  // counterweight, cartridge, and stylus. The stylus rests just above the record surface.
-  tonearm = new THREE.Group(); tonearm.position.set(2.0,.48,-1.35); deckGroup.add(tonearm);
-  const baseMetal = new THREE.MeshPhysicalMaterial({color:0x51483e,roughness:.24,metalness:.88,clearcoat:.65,clearcoatRoughness:.16});
-  const brightMetal = new THREE.MeshPhysicalMaterial({color:0xb9ad9b,roughness:.2,metalness:.92,clearcoat:.8,clearcoatRoughness:.12});
-  const darkMetal = new THREE.MeshPhysicalMaterial({color:0x211d18,roughness:.3,metalness:.82,clearcoat:.55});
-  const brass = new THREE.MeshPhysicalMaterial({color:0xb39a75,roughness:.28,metalness:.78,clearcoat:.55});
-  const pivotBase = new THREE.Mesh(new THREE.CylinderGeometry(.31,.34,.09,48),baseMetal);
-  pivotBase.position.y=.05; pivotBase.castShadow=true; pivotBase.receiveShadow=true; tonearm.add(pivotBase);
-  const pivot = new THREE.Mesh(new THREE.CylinderGeometry(.205,.24,.2,48),baseMetal);
-  pivot.position.y=.18; pivot.castShadow=true; pivot.receiveShadow=true; tonearm.add(pivot);
-  const pivotRing = new THREE.Mesh(new THREE.TorusGeometry(.17,.018,8,48),brightMetal);
-  pivotRing.rotation.x=Math.PI/2; pivotRing.position.y=.285; tonearm.add(pivotRing);
-  const pivotCap = new THREE.Mesh(new THREE.CylinderGeometry(.115,.14,.1,40),brightMetal);
-  pivotCap.position.y=.32; pivotCap.castShadow=true; tonearm.add(pivotCap);
-  const pivotPin = new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.11,24),darkMetal);
-  pivotPin.position.y=.405; tonearm.add(pivotPin);
-
-  const armRoot = new THREE.Group(); armRoot.rotation.y=ARM_PARK_ANGLE; armRoot.position.y=.32; tonearm.add(armRoot);
-  const armTube = new THREE.Mesh(new THREE.CylinderGeometry(.039,.052,2.0,24),brightMetal);
-  armTube.rotation.x=Math.PI/2; armTube.position.z=-1.0; armTube.castShadow=true; armTube.receiveShadow=true; armRoot.add(armTube);
-  const armHighlight = new THREE.Mesh(new THREE.CylinderGeometry(.008,.01,1.72,12),new THREE.MeshStandardMaterial({color:0xe1d4bd,metalness:.9,roughness:.19}));
-  armHighlight.rotation.x=Math.PI/2; armHighlight.position.set(-.012,.027,-1.0); armRoot.add(armHighlight);
-  const rearCollar = new THREE.Mesh(new THREE.CylinderGeometry(.072,.072,.14,24),darkMetal);
-  rearCollar.rotation.x=Math.PI/2; rearCollar.position.z=.12; armRoot.add(rearCollar);
-  const counterStem = new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.32,20),baseMetal);
-  counterStem.rotation.x=Math.PI/2; counterStem.position.z=.27; armRoot.add(counterStem);
-  const counter = new THREE.Mesh(new THREE.CylinderGeometry(.145,.16,.32,32),darkMetal);
-  counter.rotation.x=Math.PI/2; counter.position.z=.46; counter.castShadow=true; armRoot.add(counter);
-  const counterBand = new THREE.Mesh(new THREE.CylinderGeometry(.163,.163,.045,32),brass);
-  counterBand.rotation.x=Math.PI/2; counterBand.position.z=.39; armRoot.add(counterBand);
-
-  const headBracket = new THREE.Mesh(new THREE.BoxGeometry(.22,.075,.2),baseMetal);
-  headBracket.position.set(0,-.035,-1.91); headBracket.castShadow=true; armRoot.add(headBracket);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(.29,.125,.28),darkMetal);
-  head.position.set(0,-.055,-2.0); head.castShadow=true; head.receiveShadow=true; armRoot.add(head);
-  const headTop = new THREE.Mesh(new THREE.BoxGeometry(.235,.018,.19),brass);
-  headTop.position.set(0,.014,-1.99); armRoot.add(headTop);
-  const headPlate = new THREE.Mesh(new THREE.BoxGeometry(.225,.022,.2),brightMetal);
-  headPlate.position.set(0,-.125,-2.035); armRoot.add(headPlate);
-  const stylusMount = new THREE.Mesh(new THREE.BoxGeometry(.085,.07,.095),darkMetal);
-  stylusMount.position.set(0,-.15,-2.075); armRoot.add(stylusMount);
-  armNeedle = new THREE.Mesh(new THREE.CylinderGeometry(.009,.0025,.085,12),brightMetal);
-  armNeedle.position.set(0,-.185,-2.085); armNeedle.castShadow=true; armRoot.add(armNeedle);
-  const stylusTip = new THREE.Mesh(new THREE.SphereGeometry(.012,12,8),brass);
-  stylusTip.position.set(0,-.202,-2.085); armRoot.add(stylusTip);
-  // A transparent raycast capsule follows the actual arm, so tapping the arm changes track precisely.
-  armHitProxy = new THREE.Mesh(
-    new THREE.CylinderGeometry(.13,.13,2.55,12),
-    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide})
-  );
-  armHitProxy.rotation.x = Math.PI/2;
-  armHitProxy.position.set(0,-.005,-1.04);
-  armHitProxy.userData.deckInteraction = 'arm';
-  armRoot.add(armHitProxy);
-  armPivotProxy = new THREE.Mesh(
-    new THREE.SphereGeometry(.34,16,12),
-    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide})
-  );
-  armPivotProxy.position.set(0,.2,0);
-  armPivotProxy.userData.deckInteraction = 'arm';
-  tonearm.add(armPivotProxy);
-  tonearm.userData.armRoot=armRoot;
-
-  // Dedicated arm rest / cradle, positioned at the exact parked stylus coordinates.
-  // With the calibrated rest angle, the stylus is at deckGroup x=2.55, z=0.66.
-  const restPad = new THREE.Mesh(new THREE.BoxGeometry(.19,.045,.23), darkMetal);
-  restPad.position.set(2.55,.19,.66); restPad.castShadow=true; restPad.receiveShadow=true; deckGroup.add(restPad);
-  const restPost = new THREE.Mesh(new THREE.CylinderGeometry(.026,.038,.17,20), baseMetal);
-  restPost.position.set(2.55,.295,.66); restPost.castShadow=true; deckGroup.add(restPost);
-  const restCradle = new THREE.Mesh(new THREE.TorusGeometry(.075,.014,8,28), brass);
-  restCradle.rotation.x=Math.PI/2; restCradle.position.set(2.55,.39,.66); restCradle.castShadow=true; deckGroup.add(restCradle);
-
-  ready3D=true;
-  resize();
-  setStatus('');
-  requestAnimationFrame(render);
-}
-function resize(){
-  if(!renderer||!camera) return;
-  const r = sceneWrap.getBoundingClientRect();
-  if(!r.width || !r.height) return;
-  renderer.setSize(r.width, r.height, false);
-  const compact = r.width < 560;
-  camera.aspect = r.width / r.height;
-  camera.position.set(0, compact ? 7.0 : 6.2, compact ? 8.9 : 7.8);
-  camera.fov = compact ? 35 : 34;
-  camera.updateProjectionMatrix();
-  camera.lookAt(0,.1,0);
-}
-function angleForProgress(){
-  if(!audio.duration || !Number.isFinite(audio.duration)) return ARM_PLAY_START_ANGLE;
-  const p = THREE.MathUtils.clamp(audio.currentTime / audio.duration, 0, 1);
-  return THREE.MathUtils.lerp(ARM_PLAY_START_ANGLE, ARM_PLAY_END_ANGLE, p);
-}
-function cueTonearm(){
-  armLiftTarget = ARM_CUE_LIFT;
-  armTarget = angleForProgress();
-  armSequence = 'cue';
-}
-function parkTonearm(){
-  // Lift first, swing to the calibrated cradle, then lower into the resting height.
-  armLiftTarget = ARM_CUE_LIFT;
-  armSequence = 'park-lift';
-}
-function render(){
-  const dt = Math.min(clock.getDelta(), .05);
-  if(ready3D){
-    const motorTau = spinTarget ? 1-Math.exp(-dt/.72) : 1-Math.exp(-dt/.85);
-    spinVelocity += (spinTarget-spinVelocity)*motorTau;
-    baseRecordRotation += spinVelocity*dt;
-    recordGroup.rotation.y = baseRecordRotation;
-
-    if(playing && armSequence !== 'cue' && armSequence !== 'cue-lower') armTarget = angleForProgress();
-    armCurrent += (armTarget-armCurrent)*(1-Math.exp(-dt/.42));
-    armLiftCurrent += (armLiftTarget-armLiftCurrent)*(1-Math.exp(-dt/.2));
-    tonearm.userData.armRoot.rotation.y = armCurrent;
-    tonearm.userData.armRoot.position.y = .12 + armLiftCurrent;
-
-    if(armSequence === 'park-lift' && armLiftCurrent > .16){
-      armTarget = ARM_PARK_ANGLE;
-      armSequence = 'parking';
-    } else if(armSequence === 'parking' && Math.abs(armCurrent-ARM_PARK_ANGLE) < .018){
-      armLiftTarget = ARM_REST_LIFT;
-      armSequence = 'park-lower';
-    } else if(armSequence === 'park-lower' && Math.abs(armLiftCurrent-ARM_REST_LIFT) < .012){
-      armSequence = 'parked';
-    } else if(armSequence === 'cue' && Math.abs(armCurrent-armTarget) < .018){
-      armLiftTarget = .025;
-      armSequence = 'cue-lower';
-    } else if(armSequence === 'cue-lower' && Math.abs(armLiftCurrent-armLiftTarget) < .012){
-      armSequence = 'playing';
-    }
-
-    camera.lookAt(0,.1,0);
-    renderer.render(scene,camera);
-  }
-  requestAnimationFrame(render);
-}
-function updateInstruction(mode){
-  if(!hint) return;
-  if(mode === 'change-track') hint.textContent = 'tap the tonearm to change song';
-  else if(mode === 'pause') hint.textContent = 'tap the vinyl to pause';
-  else hint.textContent = 'tap the vinyl to play';
-  hint.classList.add('show');
-}
-function handleDeckTap(event){
-  if(!ready3D || !renderer || !camera) return;
-  const rect = canvas.getBoundingClientRect();
-  if(!rect.width || !rect.height) return;
-  pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  pointerNdc.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
-  raycaster.setFromCamera(pointerNdc, camera);
-  const hits = raycaster.intersectObjects([armHitProxy, armPivotProxy, recordHitZone], true);
-  if(!hits.length) return;
-  const action = hits[0].object.userData.deckInteraction;
-  if(action === 'arm'){
-    changeTrackFromTonearm();
-  }else if(action === 'record'){
-    toggle();
-  }
-}
-
-function setPlayingState(next){
-  const wasPlaying = playing;
-  playing = next;
-  document.body.classList.toggle('playing', playing);
-  recordButton.setAttribute('aria-pressed', String(playing));
-  nowPlaying.classList.add('show');
-  spinTarget = playing ? RECORD_ANGULAR_SPEED : 0;
-  if(playing && !wasPlaying) cueTonearm();
-  else if(!playing && wasPlaying) parkTonearm();
-}
-function updateTrackUI(){
-  if(!currentTrack) return;
-  recordTitle.textContent = currentTrack.title;
-  if(heroTitle) heroTitle.textContent = currentTrack.title;
-  document.title = `${currentTrack.title} — record deck`;
-  progressEl.style.transform = 'scaleX(0)';
-  nowPlaying.classList.add('show');
-}
-async function play(){
-  if(!currentTrack || playing || playQueued) return;
-  playQueued = true;
-  setStatus('');
-  try{
-    const promise = audio.play();
-    setPlayingState(true);
-    if(promise && typeof promise.then === 'function') await promise;
-    playQueued = false;
-    updateInstruction('change-track');
-  }catch{
-    playQueued = false;
-    setPlayingState(false);
-    setStatus('');
-    updateInstruction('play');
-  }
-}
-function pause(){
-  playQueued = false;
+function toRest() {
+  cueToken++;
+  state.wait = false;
   audio.pause();
-  setPlayingState(false);
-  updateInstruction('play');
+  state.playing = false;
+  state.onRecord = false;
+  load(0);
+  syncUI();
 }
-async function toggle(){
-  if(playing || playQueued) pause();
-  else await play();
-}
-async function changeTrackFromTonearm(){
-  if(!tracks.length) return;
-  const nextIndex = (currentIndex + 1) % tracks.length;
-  const shouldKeepPlaying = playing || playQueued;
 
-  if(!shouldKeepPlaying){
-    // When stopped, change the selected title only; the arm remains parked until the vinyl is tapped.
-    selectTrack(nextIndex);
-    armTarget = ARM_PARK_ANGLE;
-    armSequence = 'parked';
-    armLiftTarget = ARM_REST_LIFT;
-    updateInstruction('play');
-    return;
+function toggle() {
+  if (state.playing) return pause();
+  if (state.onRecord) return startAt(state.index, audio.currentTime || 0);
+  startAt(0, 0);
+}
+
+function skip(dir) {
+  const n = state.tracks.length;
+  if (!n) return;
+  if (dir < 0 && state.onRecord && audio.currentTime > 3) return startAt(state.index, 0);
+  startAt((state.index + dir + n) % n, 0);
+}
+
+function onEnded() {
+  const next = state.index + 1;
+  if (next < state.tracks.length) return startAt(next, 0);
+  // end of the side: lift, travel back to the first groove, drop again
+  const token = ++cueToken;
+  state.wait = true;
+  load(0);
+  setTimeout(() => { if (token === cueToken) startAt(0, 0); }, 1500);
+}
+
+audio.addEventListener('ended', onEnded);
+audio.addEventListener('play', () => { if (!state.playing && !drag) { state.playing = true; state.onRecord = true; syncUI(); } });
+audio.addEventListener('pause', () => {
+  if (audio.ended || state.wait || drag) return;
+  if (state.playing) { state.playing = false; syncUI(); }
+});
+audio.addEventListener('error', () => { if (state.playing) { state.playing = false; syncUI(); } });
+
+let lastAria = 0;
+audio.addEventListener('timeupdate', () => {
+  const now = performance.now();
+  if (now - lastAria < 900) return;
+  lastAria = now;
+  const t = state.tracks[state.index];
+  el.armHit.setAttribute('aria-valuenow', String(Math.round(fAt(state.index, audio.currentTime) * 100)));
+  if (t) el.armHit.setAttribute('aria-valuetext', t.title);
+});
+
+if ('mediaSession' in navigator) {
+  const ms = navigator.mediaSession;
+  ms.setActionHandler('play', () => { if (!state.playing) toggle(); });
+  ms.setActionHandler('pause', () => { if (state.playing) pause(); });
+  ms.setActionHandler('nexttrack', () => skip(1));
+  ms.setActionHandler('previoustrack', () => skip(-1));
+}
+
+/* ───────── hint ───────── */
+let hintTimer = null;
+const seen = () => { try { return localStorage.getItem('deck.seen') === '1'; } catch { return false; } };
+function seenHint() {
+  clearTimeout(hintTimer);
+  el.hint.classList.remove('show');
+  try { localStorage.setItem('deck.seen', '1'); } catch { /* storage unavailable */ }
+}
+if (!seen()) hintTimer = setTimeout(() => el.hint.classList.add('show'), 1800);
+
+/* ───────── input ───────── */
+el.recordHit.addEventListener('click', toggle);
+el.start.addEventListener('click', toggle);
+el.prev.addEventListener('click', () => skip(-1));
+el.next.addEventListener('click', () => skip(1));
+
+const toDesign = (e) => {
+  const r = el.deck.getBoundingClientRect();
+  const s = 1120 / r.width;
+  return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s };
+};
+
+el.armHit.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  el.armHit.setPointerCapture(e.pointerId);
+  const q = toDesign(e);
+  drag = {
+    id: e.pointerId, ang0: Math.atan2(q.y - P.y, q.x - P.x), theta0: arm.theta, theta: arm.theta,
+    x0: e.clientX, y0: e.clientY, moved: false, wasPlaying: state.playing
+  };
+  if (state.playing) { cueToken++; state.wait = false; audio.pause(); state.playing = false; syncUI(); }
+  el.armHit.classList.add('is-dragging');
+});
+
+el.armHit.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
+  drag.moved = true;
+  const q = toDesign(e);
+  const ang = Math.atan2(q.y - P.y, q.x - P.x);
+  drag.theta = clamp(drag.theta0 + wrapPi(ang - drag.ang0), THETA_REST, THETA_IN);
+  const d = dForTheta(drag.theta);
+  setMeta(d <= R_OUT + 10 ? locate(fForD(d)).index : state.index);
+});
+
+function endDrag(e, cancelled) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const d0 = drag;
+  drag = null;
+  el.armHit.classList.remove('is-dragging');
+  try { el.armHit.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+  if (cancelled) return d0.wasPlaying ? startAt(state.index, audio.currentTime) : syncUI();
+  if (!d0.moved) {                                   // a tap on the arm behaves like start / stop
+    if (d0.wasPlaying) { state.onRecord = true; return syncUI(); }
+    return toggle();
+  }
+  const d = dForTheta(d0.theta);
+  if (d > R_OUT + 10) return toRest();
+  const at = locate(fForD(d));
+  startAt(at.index, at.time);
+}
+el.armHit.addEventListener('pointerup', (e) => endDrag(e, false));
+el.armHit.addEventListener('pointercancel', (e) => endDrag(e, true));
+
+el.armHit.addEventListener('keydown', (e) => {
+  const act = { ArrowRight: () => skip(1), ArrowDown: () => skip(1), ArrowLeft: () => skip(-1), ArrowUp: () => skip(-1), Enter: toggle, ' ': toggle }[e.key];
+  if (act) { e.preventDefault(); act(); }
+});
+addEventListener('keydown', (e) => {
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('button,a,[role="slider"],input,textarea')) return;
+  if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  else if (e.key === 'ArrowRight') skip(1);
+  else if (e.key === 'ArrowLeft') skip(-1);
+});
+
+/* ───────── arm rest ───────── */
+(function buildRestPost() {
+  const s = 498;
+  const x = P.x + s * Math.cos(THETA_REST), y = P.y + s * Math.sin(THETA_REST);
+  el.restPost.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${(THETA_REST * DEG + 90).toFixed(2)})`);
+  el.restPost.innerHTML = `
+    <filter id="fPost" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.6"/></filter>
+    <rect x="-18" y="-11" width="44" height="30" rx="8" fill="#000" opacity=".5" filter="url(#fPost)"/>
+    <rect x="-22" y="-15" width="44" height="30" rx="8" fill="url(#gTube)"/>
+    <rect x="-22" y="-15" width="44" height="30" rx="8" fill="none" stroke="#000" stroke-opacity=".35"/>
+    <rect x="-13" y="-5.5" width="26" height="11" rx="5.5" fill="#141311"/>
+    <rect x="-13" y="-5.5" width="26" height="11" rx="5.5" fill="none" stroke="#fff" stroke-opacity=".1"/>`;
+})();
+
+/* ───────── frame loop ───────── */
+let last = performance.now();
+let appliedDeg = NaN, appliedLift = NaN;
+const lamp = { tx: 0, ty: 0, x: 0, y: 0 };
+const root = document.documentElement;
+
+if (matchMedia('(pointer: fine)').matches) {
+  addEventListener('pointermove', (e) => { lamp.tx = e.clientX / innerWidth - 0.5; lamp.ty = e.clientY / innerHeight - 0.5; }, { passive: true });
+}
+
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  const still = reduceMotion.matches;
+
+  // platter: eased motor, long coast when it stops
+  const spinning = (state.playing || (drag && drag.wasPlaying)) && !still;
+  const target = spinning ? OMEGA : 0;
+  omega += (target - omega) * (1 - Math.exp(-dt / (target ? 0.9 : 1.9)));
+  if (omega > 0.004) {
+    rot = (rot + omega * dt) % (Math.PI * 2);
+    el.spin.style.transform = `rotate(${rot.toFixed(4)}rad)`;
   }
 
-  // Suppress the pause event from the old track so it cannot trigger a false park animation.
-  playQueued = true;
-  selectTrack(nextIndex, {preservePlayback:true});
-  cueTonearm();
-  updateInstruction('change-track');
-  try{
-    const promise = audio.play();
-    if(promise && typeof promise.then === 'function') await promise;
-    playQueued = false;
-    // Keep the playing flag and motor state intact: changing tracks never sends the arm to rest.
-  }catch{
-    playQueued = false;
-    setPlayingState(false);
-    setStatus('');
-    updateInstruction('play');
+  // tonearm
+  let tTheta, tLift, tau;
+  if (drag) { tTheta = drag.theta; tLift = 1; tau = 0.05; }
+  else if (state.onRecord) {
+    tTheta = thetaForD(R_OUT - fAt(state.index, audio.currentTime || 0) * (R_OUT - R_IN));
+    tLift = state.playing && !state.wait ? 0 : 1;
+    tau = 0.32;
+  } else { tTheta = THETA_REST; tLift = 1; tau = 0.5; }
+  if (still) tau = 0.001;
+  arm.theta += (tTheta - arm.theta) * (1 - Math.exp(-dt / tau));
+  arm.lift += (tLift - arm.lift) * (1 - Math.exp(-dt / (still ? 0.001 : 0.22)));
+  paintArm();
+
+  // lamp follows the pointer, barely
+  if (!still) {
+    lamp.x += (lamp.tx - lamp.x) * (1 - Math.exp(-dt / 0.35));
+    lamp.y += (lamp.ty - lamp.y) * (1 - Math.exp(-dt / 0.35));
+    root.style.setProperty('--lamp-x', (42 + lamp.x * 7).toFixed(2) + '%');
+    root.style.setProperty('--lamp-y', (40 + lamp.y * 6).toFixed(2) + '%');
+    el.deck.style.setProperty('--lx', (22 + lamp.x * 12).toFixed(2) + '%');
+    el.deck.style.setProperty('--ly', (6 + lamp.y * 10).toFixed(2) + '%');
   }
-}
-function next(){
-  return changeTrackFromTonearm();
+  requestAnimationFrame(frame);
 }
 
-// The transparent DOM buttons remain keyboard-accessible; pointer taps use exact 3D raycasting.
-recordButton.addEventListener('click', toggle);
-armButton.addEventListener('click', changeTrackFromTonearm);
-canvas.addEventListener('click', handleDeckTap);
+function paintArm() {
+  const deg = arm.theta * DEG;
+  if (Math.abs(deg - appliedDeg) < 0.003 && Math.abs(arm.lift - appliedLift) < 0.002) return;
+  appliedDeg = deg; appliedLift = arm.lift;
+  const s = 1 + 0.012 * arm.lift;
+  el.arm.setAttribute('transform', `translate(${P.x} ${P.y}) rotate(${deg.toFixed(3)}) scale(${s.toFixed(4)})`);
+  el.armShadow.setAttribute('transform', `translate(${(P.x + 8 + 16 * arm.lift).toFixed(2)} ${(P.y + 11 + 22 * arm.lift).toFixed(2)}) rotate(${deg.toFixed(3)}) scale(${s.toFixed(4)})`);
+  el.shadowBlur.setAttribute('stdDeviation', (2.4 + 4.4 * arm.lift).toFixed(2));
+  el.armHit.style.transform = `rotate(${deg.toFixed(3)}deg) translateY(-50%)`;
+}
 
-window.addEventListener('resize', resize, {passive:true});
-if ('ResizeObserver' in window && sceneWrap) new ResizeObserver(resize).observe(sceneWrap);
-document.addEventListener('visibilitychange',()=>{
-  if(document.hidden) spinTarget = 0;
-  else spinTarget = playing ? RECORD_ANGULAR_SPEED : 0;
-});
-
-audio.addEventListener('loadeddata',()=>{ setStatus(''); });
-audio.addEventListener('play',()=>{ if(!playing) setPlayingState(true); });
-audio.addEventListener('pause',()=>{
-  if(ignorePauseEventCount > 0){ ignorePauseEventCount--; return; }
-  if(playing && !playQueued) setPlayingState(false);
-});
-audio.addEventListener('timeupdate',()=>{
-  if(audio.duration) progressEl.style.transform = `scaleX(${Math.min(audio.currentTime/audio.duration,1)})`;
-});
-audio.addEventListener('ended',()=>{ playQueued=false; setPlayingState(false); updateInstruction('play'); });
-audio.addEventListener('error',()=>{ setStatus(''); });
-
-// Show a fresh, useful instruction on every visit; no stale localStorage flag can suppress it.
-updateInstruction('play');
-if(!('WebGLRenderingContext' in window)) document.documentElement.classList.add('is-no-webgl');
-
+/* ───────── go ───────── */
+paintArm();
+requestAnimationFrame(frame);
 loadTracks();
-init3D().catch(err=>{
-  console.warn(err);
-  document.documentElement.classList.add('is-no-webgl');
-  setStatus('');
-});
+
+const fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+const imagesReady = Promise.all([...document.images].map((i) => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())));
+Promise.race([Promise.all([fontsReady, imagesReady]), new Promise((r) => setTimeout(r, 1200))])
+  .then(() => requestAnimationFrame(() => document.body.classList.add('is-ready')));
