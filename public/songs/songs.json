@@ -1,16 +1,16 @@
 {
   "tracks": [
     {
-      "filename": "song1.mp3",
-      "title": "song 1"
+      "filename": "Hoor.mp3",
+      "title": "Hoor"
     },
     {
-      "filename": "song2.mp3",
-      "title": "song 2"
+      "filename": "Tu.mp3",
+      "title": "Tu"
     },
     {
-      "filename": "song3.mp3",
-      "title": "song 3"
+      "filename": "Safar.mp3",
+      "title": "Safar"
     }
   ]
 }

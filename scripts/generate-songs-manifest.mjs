@@ -16,10 +16,20 @@ function titleFromFilename(filename) {
     .trim();
 }
 
+const preferredOrder = ['hoor.mp3', 'tu.mp3', 'safar.mp3'];
 const files = (await readdir(songsDir, { withFileTypes: true }))
   .filter((entry) => entry.isFile() && /\.mp3$/i.test(entry.name))
   .map((entry) => entry.name)
-  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  .sort((a, b) => {
+    const ai = preferredOrder.indexOf(a.toLowerCase());
+    const bi = preferredOrder.indexOf(b.toLowerCase());
+    if (ai !== -1 || bi !== -1) {
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    }
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  });
 
 const manifest = {
   tracks: files.map((filename) => ({ filename, title: titleFromFilename(filename) || 'untitled' }))

@@ -14,15 +14,16 @@ const audio = $('#audioPlayer');
 const status = $('#systemStatus');
 
 const TRACK_FALLBACK = [
-  { filename: 'song1.mp3' },
-  { filename: 'song2.mp3' },
-  { filename: 'song3.mp3' }
+  { filename: 'Hoor.mp3' },
+  { filename: 'Tu.mp3' },
+  { filename: 'Safar.mp3' }
 ];
 let tracks = [];
 let currentIndex = -1;
 let currentTrack = null;
 let playing = false;
 let playQueued = false;
+let ignorePauseEventCount = 0;
 
 function setStatus(text=''){ status.textContent = text; }
 function titleFromFilename(filename=''){
@@ -52,20 +53,20 @@ async function loadTracks(){
     tracks = mapTracks(TRACK_FALLBACK);
   }
   if(!tracks.length) tracks = mapTracks(TRACK_FALLBACK);
-  selectTrack(Math.max(0, Math.floor(Math.random() * tracks.length)));
+  // Start consistently with the first filename-sorted track.
+  selectTrack(0);
 }
-function selectTrack(index){
+function selectTrack(index, {preservePlayback=false}={}){
   if(!tracks.length) return;
   currentIndex = (index + tracks.length) % tracks.length;
   currentTrack = tracks[currentIndex];
+  // Loading a replacement source pauses the current media element. Suppress that one
+  // pause event when this is a seamless track change so it cannot park the arm.
+  if(preservePlayback && !audio.paused && !audio.ended) ignorePauseEventCount++;
   audio.pause();
   audio.src = currentTrack.url;
   audio.load();
-  recordTitle.textContent = currentTrack.title;
-  if (heroTitle) heroTitle.textContent = currentTrack.title;
-  document.title = `${currentTrack.title} — record deck`;
-  progressEl.style.transform = 'scaleX(0)';
-  nowPlaying.classList.add('show');
+  updateTrackUI();
 }
 
 let renderer, scene, camera, record, recordTop, recordGrooves, tonearm, armNeedle, platter, deckGroup, keyLight;
@@ -76,13 +77,15 @@ let raycaster = new THREE.Raycaster();
 let pointerNdc = new THREE.Vector2();
 let spinVelocity = 0;
 let spinTarget = 0;
-const ARM_PARK_ANGLE = Math.PI * 2 - 2.8; // parks the stylus at the lower-right rest area, inside the plinth
+const ARM_PARK_ANGLE = 3.409; // calibrated so the stylus rests on the lower-right cradle, inside the plinth
+const ARM_REST_LIFT = .08;
+const ARM_CUE_LIFT = .2;
 const ARM_PLAY_START_ANGLE = 2.9;
 const ARM_PLAY_END_ANGLE = 2.64;
 let armTarget = ARM_PARK_ANGLE;
 let armCurrent = ARM_PARK_ANGLE;
-let armLiftTarget = .2;
-let armLiftCurrent = .2;
+let armLiftTarget = ARM_REST_LIFT;
+let armLiftCurrent = ARM_REST_LIFT;
 let armSequence = 'parked';
 const RECORD_RPM = 33 + 1 / 3;
 const RECORD_ANGULAR_SPEED = RECORD_RPM * Math.PI * 2 / 60;
@@ -264,6 +267,15 @@ async function init3D(){
   tonearm.add(armPivotProxy);
   tonearm.userData.armRoot=armRoot;
 
+  // Dedicated arm rest / cradle, positioned at the exact parked stylus coordinates.
+  // With the calibrated rest angle, the stylus is at deckGroup x=2.55, z=0.66.
+  const restPad = new THREE.Mesh(new THREE.BoxGeometry(.19,.045,.23), darkMetal);
+  restPad.position.set(2.55,.19,.66); restPad.castShadow=true; restPad.receiveShadow=true; deckGroup.add(restPad);
+  const restPost = new THREE.Mesh(new THREE.CylinderGeometry(.026,.038,.17,20), baseMetal);
+  restPost.position.set(2.55,.295,.66); restPost.castShadow=true; deckGroup.add(restPost);
+  const restCradle = new THREE.Mesh(new THREE.TorusGeometry(.075,.014,8,28), brass);
+  restCradle.rotation.x=Math.PI/2; restCradle.position.set(2.55,.39,.66); restCradle.castShadow=true; deckGroup.add(restCradle);
+
   ready3D=true;
   resize();
   setStatus('');
@@ -287,13 +299,13 @@ function angleForProgress(){
   return THREE.MathUtils.lerp(ARM_PLAY_START_ANGLE, ARM_PLAY_END_ANGLE, p);
 }
 function cueTonearm(){
-  armLiftTarget = .2;
+  armLiftTarget = ARM_CUE_LIFT;
   armTarget = angleForProgress();
   armSequence = 'cue';
 }
 function parkTonearm(){
-  // Lift clear of the grooves first; only swing back to the side-rest after the stylus has risen.
-  armLiftTarget = .2;
+  // Lift first, swing to the calibrated cradle, then lower into the resting height.
+  armLiftTarget = ARM_CUE_LIFT;
   armSequence = 'park-lift';
 }
 function render(){
@@ -304,21 +316,24 @@ function render(){
     baseRecordRotation += spinVelocity*dt;
     recordGroup.rotation.y = baseRecordRotation;
 
-    if(playing && armSequence !== 'cue') armTarget = angleForProgress();
-    armCurrent += (armTarget-armCurrent)*(1-Math.exp(-dt/.52));
-    armLiftCurrent += (armLiftTarget-armLiftCurrent)*(1-Math.exp(-dt/.22));
+    if(playing && armSequence !== 'cue' && armSequence !== 'cue-lower') armTarget = angleForProgress();
+    armCurrent += (armTarget-armCurrent)*(1-Math.exp(-dt/.42));
+    armLiftCurrent += (armLiftTarget-armLiftCurrent)*(1-Math.exp(-dt/.2));
     tonearm.userData.armRoot.rotation.y = armCurrent;
     tonearm.userData.armRoot.position.y = .12 + armLiftCurrent;
 
     if(armSequence === 'park-lift' && armLiftCurrent > .16){
       armTarget = ARM_PARK_ANGLE;
       armSequence = 'parking';
-    } else if(armSequence === 'parking' && Math.abs(armCurrent-ARM_PARK_ANGLE) < .025){
+    } else if(armSequence === 'parking' && Math.abs(armCurrent-ARM_PARK_ANGLE) < .018){
+      armLiftTarget = ARM_REST_LIFT;
+      armSequence = 'park-lower';
+    } else if(armSequence === 'park-lower' && Math.abs(armLiftCurrent-ARM_REST_LIFT) < .012){
       armSequence = 'parked';
-    } else if(armSequence === 'cue' && Math.abs(armCurrent-armTarget) < .025){
+    } else if(armSequence === 'cue' && Math.abs(armCurrent-armTarget) < .018){
       armLiftTarget = .025;
       armSequence = 'cue-lower';
-    } else if(armSequence === 'cue-lower' && Math.abs(armLiftCurrent-armLiftTarget) < .015){
+    } else if(armSequence === 'cue-lower' && Math.abs(armLiftCurrent-armLiftTarget) < .012){
       armSequence = 'playing';
     }
 
@@ -345,41 +360,50 @@ function handleDeckTap(event){
   if(!hits.length) return;
   const action = hits[0].object.userData.deckInteraction;
   if(action === 'arm'){
-    next();
-    updateInstruction('pause');
+    changeTrackFromTonearm();
   }else if(action === 'record'){
     toggle();
-    updateInstruction(playing || playQueued ? 'change-track' : 'play');
   }
 }
 
 function setPlayingState(next){
+  const wasPlaying = playing;
   playing = next;
   document.body.classList.toggle('playing', playing);
   recordButton.setAttribute('aria-pressed', String(playing));
   nowPlaying.classList.add('show');
   spinTarget = playing ? RECORD_ANGULAR_SPEED : 0;
-  if(playing) cueTonearm();
-  else parkTonearm();
+  if(playing && !wasPlaying) cueTonearm();
+  else if(!playing && wasPlaying) parkTonearm();
+}
+function updateTrackUI(){
+  if(!currentTrack) return;
+  recordTitle.textContent = currentTrack.title;
+  if(heroTitle) heroTitle.textContent = currentTrack.title;
+  document.title = `${currentTrack.title} — record deck`;
+  progressEl.style.transform = 'scaleX(0)';
+  nowPlaying.classList.add('show');
 }
 async function play(){
-  if(!currentTrack) return;
+  if(!currentTrack || playing || playQueued) return;
   playQueued = true;
   setStatus('');
-  let playPromise;
-  try { playPromise = audio.play(); }
-  catch { playPromise = Promise.reject(new Error('audio playback unavailable')); }
-  setPlayingState(true);
-  try { await playPromise; }
-  catch {
-    // Keep the tactile deck controls responsive even when a browser blocks audio or a file is unavailable.
+  try{
+    const promise = audio.play();
+    setPlayingState(true);
+    if(promise && typeof promise.then === 'function') await promise;
+    playQueued = false;
+    updateInstruction('change-track');
+  }catch{
+    playQueued = false;
+    setPlayingState(false);
+    setStatus('');
+    updateInstruction('play');
   }
-  playQueued = false;
-  updateInstruction('change-track');
 }
 function pause(){
-  audio.pause();
   playQueued = false;
+  audio.pause();
   setPlayingState(false);
   updateInstruction('play');
 }
@@ -387,19 +411,45 @@ async function toggle(){
   if(playing || playQueued) pause();
   else await play();
 }
-async function next(){
+async function changeTrackFromTonearm(){
   if(!tracks.length) return;
-  let n;
-  do { n = Math.floor(Math.random() * tracks.length); }
-  while(tracks.length > 1 && n === currentIndex);
-  selectTrack(n);
-  updateInstruction(playing ? 'pause' : 'play');
-  await play();
+  const nextIndex = (currentIndex + 1) % tracks.length;
+  const shouldKeepPlaying = playing || playQueued;
+
+  if(!shouldKeepPlaying){
+    // When stopped, change the selected title only; the arm remains parked until the vinyl is tapped.
+    selectTrack(nextIndex);
+    armTarget = ARM_PARK_ANGLE;
+    armSequence = 'parked';
+    armLiftTarget = ARM_REST_LIFT;
+    updateInstruction('play');
+    return;
+  }
+
+  // Suppress the pause event from the old track so it cannot trigger a false park animation.
+  playQueued = true;
+  selectTrack(nextIndex, {preservePlayback:true});
+  cueTonearm();
+  updateInstruction('change-track');
+  try{
+    const promise = audio.play();
+    if(promise && typeof promise.then === 'function') await promise;
+    playQueued = false;
+    // Keep the playing flag and motor state intact: changing tracks never sends the arm to rest.
+  }catch{
+    playQueued = false;
+    setPlayingState(false);
+    setStatus('');
+    updateInstruction('play');
+  }
+}
+function next(){
+  return changeTrackFromTonearm();
 }
 
 // The transparent DOM buttons remain keyboard-accessible; pointer taps use exact 3D raycasting.
 recordButton.addEventListener('click', toggle);
-armButton.addEventListener('click', next);
+armButton.addEventListener('click', changeTrackFromTonearm);
 canvas.addEventListener('click', handleDeckTap);
 
 window.addEventListener('resize', resize, {passive:true});
@@ -411,11 +461,14 @@ document.addEventListener('visibilitychange',()=>{
 
 audio.addEventListener('loadeddata',()=>{ setStatus(''); });
 audio.addEventListener('play',()=>{ if(!playing) setPlayingState(true); });
-audio.addEventListener('pause',()=>{ if(playing && !playQueued) setPlayingState(false); });
+audio.addEventListener('pause',()=>{
+  if(ignorePauseEventCount > 0){ ignorePauseEventCount--; return; }
+  if(playing && !playQueued) setPlayingState(false);
+});
 audio.addEventListener('timeupdate',()=>{
   if(audio.duration) progressEl.style.transform = `scaleX(${Math.min(audio.currentTime/audio.duration,1)})`;
 });
-audio.addEventListener('ended',()=>{ setPlayingState(false); next(); });
+audio.addEventListener('ended',()=>{ playQueued=false; setPlayingState(false); updateInstruction('play'); });
 audio.addEventListener('error',()=>{ setStatus(''); });
 
 // Show a fresh, useful instruction on every visit; no stale localStorage flag can suppress it.
