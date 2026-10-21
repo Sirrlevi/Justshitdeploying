@@ -28,7 +28,23 @@
       <div class="hero__scene" id="sceneWrap">
         <canvas id="webgl" aria-label="Interactive three-dimensional vinyl record player"></canvas>
         <div class="scene-fallback" id="sceneFallback" aria-hidden="true">
-          <img src="assets/vinyl-record.png" alt="" draggable="false">
+          <img src="/assets/vinyl-record.png" alt="" draggable="false">
+          <svg class="fallback-tonearm" viewBox="0 0 100 100" role="presentation" aria-hidden="true">
+            <defs>
+              <linearGradient id="tonearmMetal" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#4e4539"/><stop offset=".28" stop-color="#e1d2b9"/><stop offset=".55" stop-color="#857866"/><stop offset=".78" stop-color="#d5c5ac"/><stop offset="1" stop-color="#393128"/>
+              </linearGradient>
+              <radialGradient id="pivotMetal"><stop offset="0" stop-color="#c9b99e"/><stop offset=".5" stop-color="#6c6050"/><stop offset="1" stop-color="#211c17"/></radialGradient>
+            </defs>
+            <circle cx="84" cy="27" r="6.5" fill="#181512" stroke="#857761" stroke-width="1.2"/>
+            <circle cx="84" cy="27" r="3.5" fill="url(#pivotMetal)" stroke="#c8b79b" stroke-width=".45"/>
+            <path d="M82 31 L68 46" stroke="#100e0b" stroke-width="4.2" stroke-linecap="round"/>
+            <path d="M82 31 L68 46" stroke="url(#tonearmMetal)" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M81 32 L67 46" stroke="#e6d9c3" stroke-opacity=".6" stroke-width=".45"/>
+            <path d="M66 44 L70 47 L68 50 L64 47 Z" fill="#4a4033" stroke="#c2b092" stroke-width=".55"/>
+            <path d="M66.5 48 L65.8 50.4" stroke="#eadfc9" stroke-width=".65" stroke-linecap="round"/>
+            <circle cx="65.8" cy="50.4" r=".55" fill="#f0e3c9"/>
+          </svg>
         </div>
         <button class="hotspot hotspot--record" id="recordButton" type="button" aria-pressed="false" aria-label="Play or pause the record"></button>
         <button class="hotspot hotspot--arm" id="armButton" type="button" aria-label="Play the next track"></button>
