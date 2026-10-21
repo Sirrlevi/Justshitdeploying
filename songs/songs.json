@@ -1,0 +1,16 @@
+{
+  "tracks": [
+    {
+      "filename": "song1.mp3",
+      "title": "Track One"
+    },
+    {
+      "filename": "song2.mp3",
+      "title": "Track Two"
+    },
+    {
+      "filename": "song3.mp3",
+      "title": "Track Three"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080705">
+  <meta name="description" content="A tactile digital record deck — write code & collect music.">
+  <meta property="og:title" content="Track Three — record deck">
+  <meta property="og:description" content="A cinematic, tactile record player experience.">
+  <meta property="og:type" content="website">
+  <title>Track Three — record deck</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23080705'/%3E%3Ccircle cx='16' cy='16' r='13' fill='%23131210'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%233a332b'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e6d8bd'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Crimson+Text:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <div class="environment" aria-hidden="true">
+    <div class="environment__texture"></div>
+    <div class="environment__lamp"></div>
+    <div class="environment__surface"></div>
+  </div>
+
+  <main class="site-shell">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero__eyebrow">a small machine for listening</div>
+      <div class="hero__scene" id="sceneWrap">
+        <canvas id="webgl" aria-label="Interactive three-dimensional vinyl record player"></canvas>
+        <div class="scene-fallback" id="sceneFallback" aria-hidden="true">
+          <img src="assets/vinyl-record.png" alt="" draggable="false">
+        </div>
+        <button class="hotspot hotspot--record" id="recordButton" type="button" aria-pressed="false" aria-label="Play or pause the record"></button>
+        <button class="hotspot hotspot--arm" id="armButton" type="button" aria-label="Play the next track"></button>
+        <div class="scene-glint" aria-hidden="true"></div>
+      </div>
+
+      <div class="hero__copy">
+        <p class="interaction-hint" id="interactionHint">tap the record</p>
+        <h1 id="hero-title">Track Three</h1>
+        <div class="title-rule" aria-hidden="true"></div>
+        <div class="now-playing" id="nowPlaying" aria-live="polite">
+          <span class="now-playing__title" id="trackTitle">Track Three</span>
+          <span class="now-playing__progress"><i id="trackProgress"></i></span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p class="tagline">{ write code &amp; collect music. }</p>
+      <nav class="links" aria-label="Elsewhere">
+        <a href="https://www.instagram.com/mentallyfuvkkedup/" target="_blank" rel="noopener noreferrer">instagram</a>
+        <span aria-hidden="true">|</span>
+        <a href="https://open.spotify.com/user/31pzqjv3mp74qojr6jvwkcgn4lvy" target="_blank" rel="noopener noreferrer">spotify</a>
+        <span aria-hidden="true">|</span>
+        <a href="mailto:sirrvetohere@gmail.com">mail</a>
+      </nav>
+      <p class="quiet"><span id="quietText">crafted slowly</span></p>
+      <p class="system-status" id="systemStatus" aria-live="polite"></p>
+    </footer>
+  </main>
+
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <audio id="audioPlayer" preload="metadata"></audio>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+    }
+  }
+  </script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
