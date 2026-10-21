@@ -57,8 +57,8 @@ let pointerTarget = new THREE.Vector2();
 let pointer = new THREE.Vector2();
 let spinVelocity = 0;
 let spinTarget = 0;
-let armTarget = -0.52;
-let armCurrent = -0.52;
+let armTarget = 0.58;
+let armCurrent = 0.58;
 let armLiftTarget = .22;
 let armLiftCurrent = .22;
 let armPlaying = false;
@@ -143,10 +143,14 @@ async function init3D(){
   const pivot = new THREE.Mesh(new THREE.CylinderGeometry(.36,.43,.22,48),mat(0x2c241d,.3,.75)); pivot.rotation.x=Math.PI/2; pivot.castShadow=true; tonearm.add(pivot);
   const pivotCap = new THREE.Mesh(new THREE.CylinderGeometry(.16,.2,.25,32),mat(0x66584a,.28,.72)); pivotCap.rotation.x=Math.PI/2; pivotCap.position.y=.1; tonearm.add(pivotCap);
   const armRoot = new THREE.Group(); armRoot.rotation.y=armCurrent; armRoot.position.y=.18; tonearm.add(armRoot);
-  const armTube = new THREE.Mesh(new THREE.CylinderGeometry(.075,.105,3.05,20),mat(0x5b5147,.28,.75)); armTube.rotation.x=Math.PI/2; armTube.position.z=-1.52; armTube.castShadow=true; armRoot.add(armTube);
-  const counter = new THREE.Mesh(new THREE.CylinderGeometry(.25,.3,.58,32),mat(0x25201b,.3,.72)); counter.rotation.x=Math.PI/2; counter.position.z=.25; armRoot.add(counter);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(.28,.16,.48),mat(0x2b241d,.35,.65)); head.position.set(0,.0,-3.03); head.castShadow=true; armRoot.add(head);
-  armNeedle = new THREE.Mesh(new THREE.CylinderGeometry(.025,.018,.35,10),mat(0xc3a179,.3,.7)); armNeedle.position.set(0,-.18,-3.23); armNeedle.rotation.x=Math.PI; armRoot.add(armNeedle);
+  const armTube = new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,3.0,24),mat(0x62584d,.24,.82)); armTube.rotation.x=Math.PI/2; armTube.position.z=-1.48; armTube.castShadow=true; armTube.receiveShadow=true; armRoot.add(armTube);
+  const armCollar = new THREE.Mesh(new THREE.CylinderGeometry(.095,.095,.18,24),mat(0x28221c,.25,.82)); armCollar.rotation.x=Math.PI/2; armCollar.position.z=-2.78; armRoot.add(armCollar);
+  const counter = new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.48,32),mat(0x25201b,.28,.78)); counter.rotation.x=Math.PI/2; counter.position.z=.25; counter.castShadow=true; armRoot.add(counter);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(.31,.19,.46),mat(0x25211b,.27,.78)); head.position.set(0,-.015,-2.96); head.castShadow=true; armRoot.add(head);
+  const headPlate = new THREE.Mesh(new THREE.BoxGeometry(.245,.035,.34),mat(0x554638,.3,.72)); headPlate.position.set(0,-.12,-2.99); armRoot.add(headPlate);
+  const stylusMount = new THREE.Mesh(new THREE.BoxGeometry(.11,.09,.12),mat(0x171513,.3,.55)); stylusMount.position.set(0,-.16,-3.13); armRoot.add(stylusMount);
+  armNeedle = new THREE.Mesh(new THREE.CylinderGeometry(.012,.003,.16,10),mat(0xd7bd91,.24,.8)); armNeedle.position.set(0,-.255,-3.17); armNeedle.castShadow=true; armRoot.add(armNeedle);
+  const stylusTip = new THREE.Mesh(new THREE.SphereGeometry(.018,12,8),mat(0xe8d6b7,.2,.65)); stylusTip.position.set(0,-.34,-3.17); armRoot.add(stylusTip);
   tonearm.userData.armRoot=armRoot;
 
   const lightStrip = new THREE.Mesh(new THREE.PlaneGeometry(1.2,.8),new THREE.MeshBasicMaterial({color:0xd4a66d,transparent:true,opacity:.07,side:THREE.DoubleSide})); lightStrip.rotation.x=-Math.PI/2; lightStrip.position.set(-1.2,.52,-1.2); deckGroup.add(lightStrip);
@@ -165,7 +169,7 @@ function resize(){
 function animateArmToTrack(){
   if(!audio.duration||!Number.isFinite(audio.duration)) return;
   const p=Math.min(audio.currentTime/audio.duration,1);
-  armTarget=-.52 + p*.28;
+  armTarget=.58 - p*.24;
 }
 function render(now){
   const dt=Math.min(clock.getDelta(),.05);
@@ -199,12 +203,12 @@ function setPlayingState(next){
   nowPlaying.classList.add('show');
   spinTarget=playing?Math.PI*2/3:0; // one revolution / 3 seconds-ish; eased to 33⅓-feeling
   armLiftTarget=playing?.22:.38;
-  if(!playing) setTimeout(()=>{if(!playing) armTarget=-.52},700);
+  if(!playing) setTimeout(()=>{if(!playing) armTarget=.58},700);
 }
 function canPlayAudio(){ return Boolean(audio.src) && audio.readyState>=2; }
 async function play(){
   if(!currentTrack) return;
-  playQueued=true; setStatus(''); spinTarget=Math.PI*2/3; armTarget=-.55; armLiftTarget=.36;
+  playQueued=true; setStatus(''); spinTarget=Math.PI*2/3; armTarget=.58; armLiftTarget=.36;
   if(!audioAvailable){
     try{ await audio.play(); audioAvailable=true; }catch{
       setStatus('3D only — add MP3 files to /songs');
