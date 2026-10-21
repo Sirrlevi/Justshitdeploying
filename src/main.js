@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 
 const $ = (s) => document.querySelector(s);
-const root = document.documentElement;
 const canvas = $('#webgl');
 const sceneWrap = $('#sceneWrap');
 const recordButton = $('#recordButton');
@@ -13,60 +12,88 @@ const nowPlaying = $('#nowPlaying');
 const hint = $('#interactionHint');
 const audio = $('#audioPlayer');
 const status = $('#systemStatus');
-const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const TRACK_FALLBACK = [
-  { filename: 'song1.mp3', title: 'Track One' },
-  { filename: 'song2.mp3', title: 'Track Two' },
-  { filename: 'song3.mp3', title: 'Track Three' }
+  { filename: 'song1.mp3' },
+  { filename: 'song2.mp3' },
+  { filename: 'song3.mp3' }
 ];
 let tracks = [];
 let currentIndex = -1;
 let currentTrack = null;
 let playing = false;
 let playQueued = false;
-let audioAvailable = false;
 
 function setStatus(text=''){ status.textContent = text; }
-function mapTracks(list){ return list.map(t => ({ url:`/songs/${t.filename}`, title:t.title })); }
+function titleFromFilename(filename=''){
+  return filename
+    .replace(/\.[^.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z])([0-9])/gi, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim() || 'untitled';
+}
+function mapTracks(list){
+  return list
+    .filter(t => typeof t.filename === 'string' && /\.mp3$/i.test(t.filename))
+    .map(t => ({
+      url: `/songs/${encodeURIComponent(t.filename)}`,
+      title: titleFromFilename(t.filename),
+      filename: t.filename
+    }));
+}
 async function loadTracks(){
   try{
-    const res = await fetch('/songs/songs.json',{cache:'no-store'});
-    if(!res.ok) throw new Error('tracks manifest');
+    const res = await fetch('/songs/songs.json', { cache: 'no-store' });
+    if(!res.ok) throw new Error('track manifest unavailable');
     const data = await res.json();
-    tracks = mapTracks(Array.isArray(data.tracks) ? data.tracks : TRACK_FALLBACK);
-  }catch{ tracks = mapTracks(TRACK_FALLBACK); }
-  selectTrack(Math.max(0, Math.floor(Math.random()*tracks.length)));
+    tracks = mapTracks(Array.isArray(data.tracks) ? data.tracks : []);
+  }catch{
+    tracks = mapTracks(TRACK_FALLBACK);
+  }
+  if(!tracks.length) tracks = mapTracks(TRACK_FALLBACK);
+  selectTrack(Math.max(0, Math.floor(Math.random() * tracks.length)));
 }
 function selectTrack(index){
   if(!tracks.length) return;
   currentIndex = (index + tracks.length) % tracks.length;
   currentTrack = tracks[currentIndex];
+  audio.pause();
   audio.src = currentTrack.url;
+  audio.load();
   recordTitle.textContent = currentTrack.title;
   if (heroTitle) heroTitle.textContent = currentTrack.title;
+  document.title = `${currentTrack.title} — record deck`;
+  progressEl.style.transform = 'scaleX(0)';
   nowPlaying.classList.add('show');
 }
 
 let renderer, scene, camera, record, recordTop, recordGrooves, tonearm, armNeedle, platter, deckGroup, keyLight;
+let recordGroup, recordHitZone, armHitProxy, armPivotProxy;
 let ready3D = false;
 let clock = new THREE.Clock();
+let raycaster = new THREE.Raycaster();
+let pointerNdc = new THREE.Vector2();
 let spinVelocity = 0;
 let spinTarget = 0;
-let armTarget = 2.8;
-let armCurrent = 2.8;
+const ARM_PARK_ANGLE = 1.0;
+const ARM_PLAY_START_ANGLE = 2.9;
+const ARM_PLAY_END_ANGLE = 2.64;
+let armTarget = ARM_PARK_ANGLE;
+let armCurrent = ARM_PARK_ANGLE;
 let armLiftTarget = .2;
 let armLiftCurrent = .2;
+let armSequence = 'parked';
 const RECORD_RPM = 33 + 1 / 3;
 const RECORD_ANGULAR_SPEED = RECORD_RPM * Math.PI * 2 / 60;
-let baseRecordRotation = Math.random()*Math.PI*2;
+let baseRecordRotation = Math.random() * Math.PI * 2;
 
 function mat(color, roughness=.45, metalness=.35){
   return new THREE.MeshPhysicalMaterial({color,roughness,metalness,clearcoat:.35,clearcoatRoughness:.22});
 }
 function makeGrooves(){
-  const geo = new THREE.TorusGeometry(1.98, .009, 5, 160);
-  const m = new THREE.MeshBasicMaterial({color:0x777066,transparent:true,opacity:.08});
+  const geo = new THREE.TorusGeometry(1.91, .005, 4, 160);
+  const m = new THREE.MeshBasicMaterial({color:0x777066,transparent:true,opacity:.075});
   const group = new THREE.Group();
   for(let i=0;i<18;i++){
     const ring = new THREE.Mesh(geo,m);
@@ -122,26 +149,56 @@ async function init3D(){
   const inlay = new THREE.Mesh(new THREE.BoxGeometry(5.86,.08,4.6),mat(0x0d0a07,.72,.03));
   inlay.position.y=.12; inlay.receiveShadow=true; deckGroup.add(inlay);
 
-  platter = new THREE.Mesh(new THREE.CylinderGeometry(2.18,.2,.16,96),mat(0x11100f,.26,.82));
+  platter = new THREE.Mesh(new THREE.CylinderGeometry(2.18,2.13,.16,96),mat(0x11100f,.26,.82));
   platter.position.set(-.2,.23,0); platter.castShadow=true; platter.receiveShadow=true; deckGroup.add(platter);
 
-  const recordMat = new THREE.MeshPhysicalMaterial({color:0x0a0a09,roughness:.2,metalness:.5,clearcoat:1,clearcoatRoughness:.08});
-  record = new THREE.Mesh(new THREE.CylinderGeometry(2.04,.055,.12,128),recordMat);
-  record.position.set(-.2,.35,0); record.castShadow=true; record.receiveShadow=true; deckGroup.add(record);
+  // One shared transform keeps the disc, printed label, grooves, spindle and hit target concentric.
+  recordGroup = new THREE.Group();
+  recordGroup.position.set(-.2,0,0);
+  deckGroup.add(recordGroup);
+
+  const recordMat = new THREE.MeshPhysicalMaterial({color:0x0a0a09,roughness:.24,metalness:.42,clearcoat:1,clearcoatRoughness:.1});
+  record = new THREE.Mesh(new THREE.CylinderGeometry(2.04,2.015,.12,128),recordMat);
+  record.position.set(0,.35,0); record.castShadow=true; record.receiveShadow=true; recordGroup.add(record);
 
   const loader = new THREE.TextureLoader();
   let texture;
   try { texture = await loader.loadAsync('/assets/vinyl-record.png'); }
   catch { texture = makeProceduralVinylTexture(); }
-  texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  recordTop = new THREE.Mesh(new THREE.CircleGeometry(1.99,128),new THREE.MeshPhysicalMaterial({map:texture,transparent:true,roughness:.27,metalness:.18,clearcoat:.9,clearcoatRoughness:.08}));
-  recordTop.rotation.x=-Math.PI/2; recordTop.position.set(-.2,.415,0); recordTop.castShadow=true; deckGroup.add(recordTop);
-  recordGrooves = makeGrooves(); recordGrooves.position.set(-.2,.425,0); deckGroup.add(recordGrooves);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  recordTop = new THREE.Mesh(
+    new THREE.CircleGeometry(1.99,128),
+    new THREE.MeshPhysicalMaterial({map:texture,roughness:.31,metalness:.1,clearcoat:.62,clearcoatRoughness:.16})
+  );
+  recordTop.rotation.x = -Math.PI/2;
+  recordTop.position.set(0,.415,0);
+  recordTop.castShadow = true;
+  recordTop.receiveShadow = true;
+  recordGroup.add(recordTop);
 
-  // The center label is part of the vinyl texture. Keep a single label surface so its edge
-  // cannot double up or drift against the printed label when the record rotates.
-  const spindle = new THREE.Mesh(new THREE.CylinderGeometry(.032,.037,.065,32),mat(0x54483b,.32,.55));
-  spindle.position.set(-.2,.445,0); spindle.castShadow=false; deckGroup.add(spindle);
+  recordGrooves = makeGrooves();
+  recordGrooves.position.set(0,.419,0);
+  recordGroup.add(recordGrooves);
+
+  // The real center hole is painted out of the label texture; this single short spindle sits exactly on-axis.
+  const spindle = new THREE.Mesh(
+    new THREE.CylinderGeometry(.018,.023,.038,32),
+    mat(0x807464,.24,.82)
+  );
+  spindle.position.set(0,.434,0);
+  spindle.castShadow = false;
+  recordGroup.add(spindle);
+
+  // Invisible, concentric hit plane: taps on the visible vinyl itself toggle playback.
+  recordHitZone = new THREE.Mesh(
+    new THREE.CircleGeometry(1.975,96),
+    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide})
+  );
+  recordHitZone.rotation.x = -Math.PI/2;
+  recordHitZone.position.set(0,.426,0);
+  recordHitZone.userData.deckInteraction = 'record';
+  recordGroup.add(recordHitZone);
 
   // Tonearm assembly: explicitly placed over the platter with a visible metallic tube,
   // counterweight, cartridge, and stylus. The stylus rests just above the record surface.
@@ -161,7 +218,7 @@ async function init3D(){
   const pivotPin = new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.11,24),darkMetal);
   pivotPin.position.y=.405; tonearm.add(pivotPin);
 
-  const armRoot = new THREE.Group(); armRoot.rotation.y=2.8; armRoot.position.y=.32; tonearm.add(armRoot);
+  const armRoot = new THREE.Group(); armRoot.rotation.y=ARM_PARK_ANGLE; armRoot.position.y=.32; tonearm.add(armRoot);
   const armTube = new THREE.Mesh(new THREE.CylinderGeometry(.039,.052,2.0,24),brightMetal);
   armTube.rotation.x=Math.PI/2; armTube.position.z=-1.0; armTube.castShadow=true; armTube.receiveShadow=true; armRoot.add(armTube);
   const armHighlight = new THREE.Mesh(new THREE.CylinderGeometry(.008,.01,1.72,12),new THREE.MeshStandardMaterial({color:0xe1d4bd,metalness:.9,roughness:.19}));
@@ -189,6 +246,22 @@ async function init3D(){
   armNeedle.position.set(0,-.185,-2.085); armNeedle.castShadow=true; armRoot.add(armNeedle);
   const stylusTip = new THREE.Mesh(new THREE.SphereGeometry(.012,12,8),brass);
   stylusTip.position.set(0,-.202,-2.085); armRoot.add(stylusTip);
+  // A transparent raycast capsule follows the actual arm, so tapping the arm changes track precisely.
+  armHitProxy = new THREE.Mesh(
+    new THREE.CylinderGeometry(.13,.13,2.55,12),
+    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide})
+  );
+  armHitProxy.rotation.x = Math.PI/2;
+  armHitProxy.position.set(0,-.005,-1.04);
+  armHitProxy.userData.deckInteraction = 'arm';
+  armRoot.add(armHitProxy);
+  armPivotProxy = new THREE.Mesh(
+    new THREE.SphereGeometry(.34,16,12),
+    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false,side:THREE.DoubleSide})
+  );
+  armPivotProxy.position.set(0,.2,0);
+  armPivotProxy.userData.deckInteraction = 'arm';
+  tonearm.add(armPivotProxy);
   tonearm.userData.armRoot=armRoot;
 
   ready3D=true;
@@ -198,95 +271,155 @@ async function init3D(){
 }
 function resize(){
   if(!renderer||!camera) return;
-  const r=sceneWrap.getBoundingClientRect();
-  renderer.setSize(r.width,r.height,false);
+  const r = sceneWrap.getBoundingClientRect();
+  if(!r.width || !r.height) return;
+  renderer.setSize(r.width, r.height, false);
   const compact = r.width < 560;
-  camera.position.set(0, compact ? 7.2 : 6.2, compact ? 9.0 : 7.8);
-  camera.aspect=r.width/r.height; camera.updateProjectionMatrix();
+  camera.aspect = r.width / r.height;
+  camera.position.set(0, compact ? 7.0 : 6.2, compact ? 8.9 : 7.8);
+  camera.fov = compact ? 35 : 34;
+  camera.updateProjectionMatrix();
   camera.lookAt(0,.1,0);
 }
-function animateArmToTrack(){
-  if(!audio.duration||!Number.isFinite(audio.duration)) return;
-  const p=Math.min(audio.currentTime/audio.duration,1);
-  armTarget=2.8 - p*.25;
+function angleForProgress(){
+  if(!audio.duration || !Number.isFinite(audio.duration)) return ARM_PLAY_START_ANGLE;
+  const p = THREE.MathUtils.clamp(audio.currentTime / audio.duration, 0, 1);
+  return THREE.MathUtils.lerp(ARM_PLAY_START_ANGLE, ARM_PLAY_END_ANGLE, p);
 }
-function render(now){
-  const dt=Math.min(clock.getDelta(),.05);
+function cueTonearm(){
+  armLiftTarget = .2;
+  armTarget = angleForProgress();
+  armSequence = 'cue';
+}
+function parkTonearm(){
+  // Lift clear of the grooves first; only swing back to the side-rest after the stylus has risen.
+  armLiftTarget = .2;
+  armSequence = 'park-lift';
+}
+function render(){
+  const dt = Math.min(clock.getDelta(), .05);
   if(ready3D){
-    const motorTau=spinTarget?1-Math.exp(-dt/.82):1-Math.exp(-dt/.58);
+    const motorTau = spinTarget ? 1-Math.exp(-dt/.72) : 1-Math.exp(-dt/.85);
     spinVelocity += (spinTarget-spinVelocity)*motorTau;
     baseRecordRotation += spinVelocity*dt;
-    record.rotation.y=baseRecordRotation;
-    recordTop.rotation.z=-baseRecordRotation;
-    recordGrooves.rotation.y=baseRecordRotation;
-    if(playing) animateArmToTrack();
-    armCurrent += (armTarget-armCurrent)*(1-Math.exp(-dt/0.85));
-    armLiftCurrent += (armLiftTarget-armLiftCurrent)*(1-Math.exp(-dt/.42));
-    tonearm.userData.armRoot.rotation.y=armCurrent;
-    tonearm.userData.armRoot.position.y=.12+armLiftCurrent;
-    // Keep the camera and deck composition locked: touch interactions never shift the page or scene.
+    recordGroup.rotation.y = baseRecordRotation;
+
+    if(playing && armSequence !== 'cue') armTarget = angleForProgress();
+    armCurrent += (armTarget-armCurrent)*(1-Math.exp(-dt/.52));
+    armLiftCurrent += (armLiftTarget-armLiftCurrent)*(1-Math.exp(-dt/.22));
+    tonearm.userData.armRoot.rotation.y = armCurrent;
+    tonearm.userData.armRoot.position.y = .12 + armLiftCurrent;
+
+    if(armSequence === 'park-lift' && armLiftCurrent > .16){
+      armTarget = ARM_PARK_ANGLE;
+      armSequence = 'parking';
+    } else if(armSequence === 'parking' && Math.abs(armCurrent-ARM_PARK_ANGLE) < .025){
+      armSequence = 'parked';
+    } else if(armSequence === 'cue' && Math.abs(armCurrent-armTarget) < .025){
+      armLiftTarget = .025;
+      armSequence = 'cue-lower';
+    } else if(armSequence === 'cue-lower' && Math.abs(armLiftCurrent-armLiftTarget) < .015){
+      armSequence = 'playing';
+    }
+
     camera.lookAt(0,.1,0);
     renderer.render(scene,camera);
   }
   requestAnimationFrame(render);
 }
+function updateInstruction(mode){
+  if(!hint) return;
+  if(mode === 'change-track') hint.textContent = 'tap the tonearm to change song';
+  else if(mode === 'pause') hint.textContent = 'tap the vinyl to pause';
+  else hint.textContent = 'tap the vinyl to play';
+  hint.classList.add('show');
+}
+function handleDeckTap(event){
+  if(!ready3D || !renderer || !camera) return;
+  const rect = canvas.getBoundingClientRect();
+  if(!rect.width || !rect.height) return;
+  pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointerNdc.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+  raycaster.setFromCamera(pointerNdc, camera);
+  const hits = raycaster.intersectObjects([armHitProxy, armPivotProxy, recordHitZone], true);
+  if(!hits.length) return;
+  const action = hits[0].object.userData.deckInteraction;
+  if(action === 'arm'){
+    next();
+    updateInstruction('pause');
+  }else if(action === 'record'){
+    toggle();
+    updateInstruction(playing || playQueued ? 'change-track' : 'play');
+  }
+}
 
 function setPlayingState(next){
-  playing=next;
-  document.body.classList.toggle('playing',playing);
-  recordButton.setAttribute('aria-pressed',String(playing));
+  playing = next;
+  document.body.classList.toggle('playing', playing);
+  recordButton.setAttribute('aria-pressed', String(playing));
   nowPlaying.classList.add('show');
-  spinTarget=playing?RECORD_ANGULAR_SPEED:0;
-  armLiftTarget=playing?.025:.2;
+  spinTarget = playing ? RECORD_ANGULAR_SPEED : 0;
+  if(playing) cueTonearm();
+  else parkTonearm();
 }
 async function play(){
   if(!currentTrack) return;
-  playQueued=true; setStatus(''); spinTarget=RECORD_ANGULAR_SPEED;
-  if(!audio.currentTime) armTarget=2.8; else animateArmToTrack();
-  armLiftTarget=.025;
-  if(!audioAvailable){
-    try{ await audio.play(); audioAvailable=true; }catch{
-      // If audio is blocked or unavailable, keep the physical deck interaction working silently.
-      playQueued=false;
-      setStatus('');
-      setPlayingState(true);
-      hint.classList.remove('show');
-      return;
-    }
-  }else{
-    try{ await audio.play(); }catch{ playQueued=false; setStatus(''); setPlayingState(true); hint.classList.remove('show'); return; }
+  playQueued = true;
+  setStatus('');
+  let playPromise;
+  try { playPromise = audio.play(); }
+  catch { playPromise = Promise.reject(new Error('audio playback unavailable')); }
+  setPlayingState(true);
+  try { await playPromise; }
+  catch {
+    // Keep the tactile deck controls responsive even when a browser blocks audio or a file is unavailable.
   }
-  playQueued=false; setPlayingState(true); setStatus(''); hint.classList.remove('show');
+  playQueued = false;
+  updateInstruction('change-track');
 }
-function pause(){ audio.pause(); playQueued=false; setPlayingState(false); setStatus(''); }
-async function toggle(){ if(playing||playQueued) pause(); else await play(); }
+function pause(){
+  audio.pause();
+  playQueued = false;
+  setPlayingState(false);
+  updateInstruction('play');
+}
+async function toggle(){
+  if(playing || playQueued) pause();
+  else await play();
+}
 async function next(){
   if(!tracks.length) return;
-  let n; do n=Math.floor(Math.random()*tracks.length); while(tracks.length>1&&n===currentIndex);
-  selectTrack(n); audio.currentTime=0; await play();
+  let n;
+  do { n = Math.floor(Math.random() * tracks.length); }
+  while(tracks.length > 1 && n === currentIndex);
+  selectTrack(n);
+  updateInstruction(playing ? 'pause' : 'play');
+  await play();
 }
 
-recordButton.addEventListener('click',toggle);
-armButton.addEventListener('click',next);
+// The transparent DOM buttons remain keyboard-accessible; pointer taps use exact 3D raycasting.
+recordButton.addEventListener('click', toggle);
+armButton.addEventListener('click', next);
+canvas.addEventListener('click', handleDeckTap);
 
-window.addEventListener('resize',resize,{passive:true});
+window.addEventListener('resize', resize, {passive:true});
 if ('ResizeObserver' in window && sceneWrap) new ResizeObserver(resize).observe(sceneWrap);
-document.addEventListener('visibilitychange',()=>{ if(document.hidden) spinTarget=0; else spinTarget=playing?RECORD_ANGULAR_SPEED:0; });
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) spinTarget = 0;
+  else spinTarget = playing ? RECORD_ANGULAR_SPEED : 0;
+});
 
-audio.addEventListener('loadeddata',()=>{ audioAvailable=true; setStatus(''); });
+audio.addEventListener('loadeddata',()=>{ setStatus(''); });
 audio.addEventListener('play',()=>{ if(!playing) setPlayingState(true); });
-audio.addEventListener('pause',()=>{ if(playing&&!playQueued) setPlayingState(false); });
-audio.addEventListener('timeupdate',()=>{ if(audio.duration) progressEl.style.transform=`scaleX(${Math.min(audio.currentTime/audio.duration,1)})`; });
+audio.addEventListener('pause',()=>{ if(playing && !playQueued) setPlayingState(false); });
+audio.addEventListener('timeupdate',()=>{
+  if(audio.duration) progressEl.style.transform = `scaleX(${Math.min(audio.currentTime/audio.duration,1)})`;
+});
 audio.addEventListener('ended',()=>{ setPlayingState(false); next(); });
-audio.addEventListener('error',()=>{ audioAvailable=false; setStatus(''); });
+audio.addEventListener('error',()=>{ setStatus(''); });
 
-let interacted=false;
-try{interacted=localStorage.getItem('deck.v2.seen')==='1';}catch{}
-setTimeout(()=>{ if(!interacted&&!playing){hint.classList.add('show');} },1600);
-function remember(){try{localStorage.setItem('deck.v2.seen','1')}catch{}}
-recordButton.addEventListener('click',()=>{interacted=true;remember();hint.classList.remove('show')},{once:false});
-
-if(reduceMotion) setStatus('');
+// Show a fresh, useful instruction on every visit; no stale localStorage flag can suppress it.
+updateInstruction('play');
 if(!('WebGLRenderingContext' in window)) document.documentElement.classList.add('is-no-webgl');
 
 loadTracks();

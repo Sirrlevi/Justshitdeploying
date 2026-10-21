@@ -30,4 +30,4 @@ npm run build
 
 Use `npm run build` as the build command and `dist` as the build output directory. The `wrangler.toml` file is configured for `dist`.
 
-Track names can be edited in `public/songs/songs.json`; audio files should be valid MP3s with matching filenames in `public/songs/`.
+Add any valid `.mp3` file to `public/songs/`, commit it to GitHub, and let Cloudflare Pages rebuild. The pre-build script scans that folder and regenerates `public/songs/songs.json` automatically. Track titles come from filenames: `mohabbat-tere-dil.mp3` displays as `mohabbat tere dil`. No manual manifest edits or GitHub API token are required.

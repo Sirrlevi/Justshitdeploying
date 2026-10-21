@@ -2,15 +2,15 @@
   "tracks": [
     {
       "filename": "song1.mp3",
-      "title": "Track One"
+      "title": "song 1"
     },
     {
       "filename": "song2.mp3",
-      "title": "Track Two"
+      "title": "song 2"
     },
     {
       "filename": "song3.mp3",
-      "title": "Track Three"
+      "title": "song 3"
     }
   ]
 }
