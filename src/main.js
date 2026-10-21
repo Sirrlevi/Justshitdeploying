@@ -7,6 +7,7 @@ const sceneWrap = $('#sceneWrap');
 const recordButton = $('#recordButton');
 const armButton = $('#armButton');
 const recordTitle = $('#trackTitle');
+const heroTitle = $('#hero-title');
 const progressEl = $('#trackProgress');
 const nowPlaying = $('#nowPlaying');
 const hint = $('#interactionHint');
@@ -43,6 +44,7 @@ function selectTrack(index){
   currentTrack = tracks[currentIndex];
   audio.src = currentTrack.url;
   recordTitle.textContent = currentTrack.title;
+  if (heroTitle) heroTitle.textContent = currentTrack.title;
   nowPlaying.classList.add('show');
 }
 
@@ -102,7 +104,7 @@ async function init3D(){
   scene.fog = new THREE.FogExp2(0x090705,.035);
   camera = new THREE.PerspectiveCamera(34,1,.1,50);
   camera.position.set(0,6.2,7.8);
-  camera.lookAt(0,0,0);
+  camera.lookAt(0,.1,0);
 
   scene.add(new THREE.HemisphereLight(0xdbc4a2,0x070604,1.3));
   keyLight = new THREE.DirectionalLight(0xffdfb0,4.5);
@@ -136,9 +138,10 @@ async function init3D(){
   recordTop.rotation.x=-Math.PI/2; recordTop.position.set(-.2,.415,0); recordTop.castShadow=true; deckGroup.add(recordTop);
   recordGrooves = makeGrooves(); recordGrooves.position.set(-.2,.425,0); deckGroup.add(recordGrooves);
 
-  const label = new THREE.Mesh(new THREE.CylinderGeometry(.53,.53,.035,64),new THREE.MeshPhysicalMaterial({color:0xe6d8bd,roughness:.72,metalness:.02}));
-  label.position.set(-.2,.44,0); deckGroup.add(label);
-  const spindle = new THREE.Mesh(new THREE.CylinderGeometry(.075,.09,.16,32),mat(0x54483b,.32,.55)); spindle.position.set(-.2,.5,0); deckGroup.add(spindle);
+  // The center label is part of the vinyl texture. Keep a single label surface so its edge
+  // cannot double up or drift against the printed label when the record rotates.
+  const spindle = new THREE.Mesh(new THREE.CylinderGeometry(.032,.037,.065,32),mat(0x54483b,.32,.55));
+  spindle.position.set(-.2,.445,0); spindle.castShadow=false; deckGroup.add(spindle);
 
   // Tonearm assembly: explicitly placed over the platter with a visible metallic tube,
   // counterweight, cartridge, and stylus. The stylus rests just above the record surface.
@@ -188,8 +191,6 @@ async function init3D(){
   stylusTip.position.set(0,-.202,-2.085); armRoot.add(stylusTip);
   tonearm.userData.armRoot=armRoot;
 
-  const lightStrip = new THREE.Mesh(new THREE.PlaneGeometry(1.2,.8),new THREE.MeshBasicMaterial({color:0xd4a66d,transparent:true,opacity:.07,side:THREE.DoubleSide})); lightStrip.rotation.x=-Math.PI/2; lightStrip.position.set(-1.2,.52,-1.2); deckGroup.add(lightStrip);
-
   ready3D=true;
   resize();
   setStatus('');
@@ -199,7 +200,10 @@ function resize(){
   if(!renderer||!camera) return;
   const r=sceneWrap.getBoundingClientRect();
   renderer.setSize(r.width,r.height,false);
+  const compact = r.width < 560;
+  camera.position.set(0, compact ? 7.2 : 6.2, compact ? 9.0 : 7.8);
   camera.aspect=r.width/r.height; camera.updateProjectionMatrix();
+  camera.lookAt(0,.1,0);
 }
 function animateArmToTrack(){
   if(!audio.duration||!Number.isFinite(audio.duration)) return;
