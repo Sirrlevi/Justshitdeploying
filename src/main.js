@@ -57,8 +57,8 @@ let pointerTarget = new THREE.Vector2();
 let pointer = new THREE.Vector2();
 let spinVelocity = 0;
 let spinTarget = 0;
-let armTarget = 0.58;
-let armCurrent = 0.58;
+let armTarget = 2.15;
+let armCurrent = 2.15;
 let armLiftTarget = .22;
 let armLiftCurrent = .22;
 let armPlaying = false;
@@ -142,7 +142,7 @@ async function init3D(){
   tonearm = new THREE.Group(); tonearm.position.set(2.58,.48,-1.82); deckGroup.add(tonearm);
   const pivot = new THREE.Mesh(new THREE.CylinderGeometry(.36,.43,.22,48),mat(0x2c241d,.3,.75)); pivot.rotation.x=Math.PI/2; pivot.castShadow=true; tonearm.add(pivot);
   const pivotCap = new THREE.Mesh(new THREE.CylinderGeometry(.16,.2,.25,32),mat(0x66584a,.28,.72)); pivotCap.rotation.x=Math.PI/2; pivotCap.position.y=.1; tonearm.add(pivotCap);
-  const armRoot = new THREE.Group(); armRoot.rotation.y=armCurrent; armRoot.position.y=.18; tonearm.add(armRoot);
+  const armRoot = new THREE.Group(); armRoot.rotation.y=2.15; armRoot.position.y=.18; tonearm.add(armRoot);
   const armTube = new THREE.Mesh(new THREE.CylinderGeometry(.055,.085,3.0,24),mat(0x62584d,.24,.82)); armTube.rotation.x=Math.PI/2; armTube.position.z=-1.48; armTube.castShadow=true; armTube.receiveShadow=true; armRoot.add(armTube);
   const armCollar = new THREE.Mesh(new THREE.CylinderGeometry(.095,.095,.18,24),mat(0x28221c,.25,.82)); armCollar.rotation.x=Math.PI/2; armCollar.position.z=-2.78; armRoot.add(armCollar);
   const counter = new THREE.Mesh(new THREE.CylinderGeometry(.22,.26,.48,32),mat(0x25201b,.28,.78)); counter.rotation.x=Math.PI/2; counter.position.z=.25; counter.castShadow=true; armRoot.add(counter);
@@ -169,7 +169,7 @@ function resize(){
 function animateArmToTrack(){
   if(!audio.duration||!Number.isFinite(audio.duration)) return;
   const p=Math.min(audio.currentTime/audio.duration,1);
-  armTarget=.58 - p*.24;
+  armTarget=2.15 - p*.24;
 }
 function render(now){
   const dt=Math.min(clock.getDelta(),.05);
@@ -203,12 +203,12 @@ function setPlayingState(next){
   nowPlaying.classList.add('show');
   spinTarget=playing?Math.PI*2/3:0; // one revolution / 3 seconds-ish; eased to 33⅓-feeling
   armLiftTarget=playing?.22:.38;
-  if(!playing) setTimeout(()=>{if(!playing) armTarget=.58},700);
+  if(!playing) setTimeout(()=>{if(!playing) armTarget=2.15},700);
 }
 function canPlayAudio(){ return Boolean(audio.src) && audio.readyState>=2; }
 async function play(){
   if(!currentTrack) return;
-  playQueued=true; setStatus(''); spinTarget=Math.PI*2/3; armTarget=.58; armLiftTarget=.36;
+  playQueued=true; setStatus(''); spinTarget=Math.PI*2/3; armTarget=2.15; armLiftTarget=.36;
   if(!audioAvailable){
     try{ await audio.play(); audioAvailable=true; }catch{
       setStatus('3D only — add MP3 files to /songs');
