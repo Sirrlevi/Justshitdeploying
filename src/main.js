@@ -1,381 +1,558 @@
-/* Record deck: one side of vinyl, three tracks, one tonearm.
-   Everything on the deck is laid out on a 1120 × 884 grid (see styles.css). */
+/* A working record deck. Nothing is scripted: the platter has momentum, the stylus follows the groove, and
+   sound is whatever the groove does at the speed the record is turning (held still = silence, backwards = reversed). */
+
+import {
+  C, P, R_OUT, R_IN, DEG, clamp, wrapPi, OMEGA0, THETA_REST, THETA_IN, THETA_MIN,
+  thetaForD, dForTheta, fForD, dForF
+} from './geom.js';
+import { DeckAudio } from './audio.js';
+import { buildArm, buildDecor, buildLever, buildTicks, LEVER, LEVER_SIL } from './parts.js';
 
 const $ = (s) => document.querySelector(s);
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const wrapPi = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
-const DEG = 180 / Math.PI;
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 const el = {
-  deck: $('#deck'), spin: $('#spin'), record: $('#record'),
-  arm: $('#arm'), armShadow: $('#armShadow'), shadowBlur: $('#shadowBlur'), restPost: $('#restPost'),
-  armHit: $('#armHit'), recordHit: $('#recordHit'), start: $('#startBtn'),
+  deck: $('#deck'), spin: $('#spin'), record: $('#record'), platterHit: $('#platterHit'),
+  armSvg: $('#armSvg'), armDefs: $('#armDefs'), arm: $('#arm'), armShadow: $('#armShadow'),
+  decorStatic: $('#decorStatic'), restStand: $('#restStand'),
+  lever: $('#lever'), leverBody: $('#leverBody'), leverShadow: $('#leverShadow'), leverHit: $('#leverHit'),
+  armKey: $('#armKey'), power: $('#power'), volume: $('#volume'), trim: $('#trim'), lamp: $('#lamp'),
   prev: $('#prevBtn'), next: $('#nextBtn'),
-  meta: $('.meta'), title: $('#title'), artist: $('#artist'), hint: $('#hint'),
-  audio: $('#audio')
+  meta: $('.meta'), title: $('#title'), artist: $('#artist'), hint: $('#hint')
 };
 
-/* ───────── geometry (design units) ───────── */
-const C = { x: 442, y: 442 };            // spindle
-const P = { x: 960, y: 190 };            // tonearm pivot
-const R_OUT = 338, R_IN = 135;           // first / last groove
-const R_STOP = 124;                      // innermost the needle may travel
-const R_REST = 424;                      // needle distance from spindle when parked
-const HEAD = 14 / DEG;                   // headshell offset angle
-const TIP = { x: 522 + 63.5 * Math.cos(HEAD), y: 63.5 * Math.sin(HEAD) };   // stylus in arm space
-const L = Math.hypot(TIP.x, TIP.y), TIP_ANGLE = Math.atan2(TIP.y, TIP.x);
-const D = Math.hypot(C.x - P.x, C.y - P.y), PSI = Math.atan2(C.y - P.y, C.x - P.x);
-
-// arm rotation (radians) that puts the stylus at distance d from the spindle
-const thetaForD = (d) => PSI - Math.acos(clamp((L * L + D * D - d * d) / (2 * L * D), -1, 1)) - TIP_ANGLE;
-const dForTheta = (t) => Math.sqrt(Math.max(0, L * L + D * D - 2 * L * D * Math.cos(PSI - (t + TIP_ANGLE))));
-const THETA_REST = thetaForD(R_REST), THETA_IN = thetaForD(R_STOP);
-const fForD = (d) => clamp((R_OUT - d) / (R_OUT - R_IN), 0, 1);
-const OMEGA = (Math.PI * 2 * 100) / 3 / 60;   // 33⅓ rpm
+/* ───────── tuning ───────── */
+const LIFT_PARKED = 0.42;           // arm height while resting in its stand (0 = in the groove, 1 = held in the air)
+const LIFT_CUE = 0.78;              // raised by the cue lever
+const CONTACT = 0.14;               // stylus touches the record below this height
+const OMEGA_MAX = 30;               // rad/s a flick can reach
+const SW_OFF = -50, SW_ON = 50;     // switch positions, degrees
+const REST_TOLERANCE = 4.5 / DEG;
 
 /* ───────── state ───────── */
-const audio = el.audio;
-const state = {
-  tracks: [], dur: [], cum: [0], total: 1,
-  index: 0, playing: false, onRecord: false, wait: false
+const S = {
+  tracks: [], dur: [], span: [], cum: [0], total: 1,
+  rec: { index: 0, pos: 0 },        // where the stylus is on the record
+  motor: false, omega: 0, spin: 0, releaseT: 0,
+  trim: 0, volume: 0.8,
+  arm: { mode: 'parked', theta: THETA_REST, lift: LIFT_PARKED, fly: null, cueRaised: false },
+  hold: null, grab: null,
+  sw: { angle: SW_OFF, vel: 0, target: SW_OFF, drag: null },
+  lever: { angle: LEVER.down, vel: 0 },
+  glow: 0, shownIndex: -1, hintState: '', succeeded: false
 };
-let cueToken = 0;
-let shownIndex = -1;
+const A = S.arm;
+const audio = new DeckAudio([], onAudio);
 
-const arm = { theta: THETA_REST, lift: 1 };
-let omega = 0, rot = 0;
-let drag = null;
+/* ───────── build artwork ───────── */
+const art = buildArm();
+el.armDefs.innerHTML = art.defs;
+el.arm.innerHTML = art.body;
+el.armShadow.innerHTML = art.sil;
+const decor = buildDecor();
+el.decorStatic.innerHTML = decor.stat;
+el.restStand.innerHTML = decor.stand;
+el.leverBody.innerHTML = buildLever();
+el.leverShadow.innerHTML = LEVER_SIL;
+$('#volTicks').innerHTML = buildTicks();
+const armBlur = $('#armBlur');
+el.powerRotor = el.power.querySelector('.power__rotor');
+
+/* ───────── record geometry ───────── */
+const thetaForRec = (index, pos) => thetaForD(dForF(clamp((S.cum[index] + pos) / S.total, 0, 1)));
+function locate(f) {
+  const t = f * S.total;
+  let i = S.tracks.findIndex((_, k) => t < S.cum[k + 1]);
+  if (i < 0) i = S.tracks.length - 1;
+  return { index: i, pos: clamp(t - S.cum[i], 0, Math.max(0, S.span[i] - 0.3)) };
+}
+function relayout() {
+  const known = S.dur.filter(Boolean);
+  const fill = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
+  S.span = S.dur.map((v) => v || fill);
+  S.cum = [0];
+  S.span.forEach((v) => S.cum.push(S.cum[S.cum.length - 1] + v));
+  S.total = S.cum[S.cum.length - 1] || 1;
+  el.record.querySelectorAll('.gap').forEach((n) => n.remove());
+  const label = el.record.querySelector('.label');
+  for (let i = 1; i < S.tracks.length; i++) {
+    const ring = document.createElement('div');
+    ring.className = 'gap';
+    ring.style.setProperty('--r', (R_OUT - (S.cum[i] / S.total) * (R_OUT - R_IN)).toFixed(2));
+    el.record.insertBefore(ring, label);
+  }
+}
 
 /* ───────── tracks ───────── */
-const FALLBACK = ['song1', 'song2', 'song3'].map((n, i) => ({ filename: `${n}.mp3`, title: `Track ${i + 1}` }));
-
 async function loadTracks() {
   let list = null;
   try {
     const res = await fetch('/songs/songs.json', { cache: 'no-cache' });
     if (res.ok) list = (await res.json()).tracks;
   } catch { /* fall through */ }
-  if (!Array.isArray(list) || !list.length) list = FALLBACK;
-
-  state.tracks = list.map((t) => ({ url: `/songs/${t.filename}`, title: t.title || '', artist: t.artist || '' }));
-  state.dur = list.map((t) => (Number(t.duration) > 0 ? Number(t.duration) : 0));
+  if (!Array.isArray(list) || !list.length) list = ['song1.m4a', 'song2.mp3', 'song3.m4a'].map((f, i) => ({ filename: f, title: `Track ${i + 1}` }));
+  S.tracks = list.map((t) => ({ url: `/songs/${t.filename}`, title: t.title || '', artist: t.artist || '' }));
+  S.dur = list.map((t) => (Number(t.duration) > 0 ? Number(t.duration) : 0));
+  audio.tracks = S.tracks;
   relayout();
-  load(0);
-  state.dur.forEach((d, i) => { if (!d) probeDuration(i); });
-}
-
-function probeDuration(i) {
-  const a = new Audio();
-  a.preload = 'metadata';
-  a.addEventListener('loadedmetadata', () => {
-    if (Number.isFinite(a.duration)) { state.dur[i] = a.duration; relayout(); }
-  }, { once: true });
-  a.src = state.tracks[i].url;
-}
-
-function relayout() {
-  const known = state.dur.filter(Boolean);
-  const fill = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
-  const d = state.dur.map((v) => v || fill);
-  state.cum = [0];
-  d.forEach((v) => state.cum.push(state.cum[state.cum.length - 1] + v));
-  state.total = state.cum[state.cum.length - 1] || 1;
-  state.span = d;
-  buildGaps();
-}
-
-function buildGaps() {
-  el.record.querySelectorAll('.gap').forEach((n) => n.remove());
-  const label = el.record.querySelector('.label');
-  for (let i = 1; i < state.tracks.length; i++) {
-    const r = R_OUT - (state.cum[i] / state.total) * (R_OUT - R_IN);
-    const ring = document.createElement('div');
-    ring.className = 'gap';
-    ring.style.setProperty('--r', r.toFixed(2));
-    el.record.insertBefore(ring, label);
-  }
-}
-
-const fAt = (index, t) => clamp((state.cum[index] + t) / state.total, 0, 1);
-function locate(f) {
-  const time = f * state.total;
-  let i = state.tracks.findIndex((_, k) => time < state.cum[k + 1]);
-  if (i < 0) i = state.tracks.length - 1;
-  return { index: i, time: clamp(time - state.cum[i], 0, Math.max(0, state.span[i] - 0.25)) };
-}
-
-function load(index) {
-  state.index = index;
-  audio.src = state.tracks[index].url;
-  setMeta(index, true);
+  setMeta(0, true);
+  audio.setVolume(S.volume);
 }
 
 function setMeta(index, instant) {
-  if (index === shownIndex) return;
-  shownIndex = index;
-  const t = state.tracks[index];
+  if (index === S.shownIndex || !S.tracks[index]) return;
+  S.shownIndex = index;
+  const t = S.tracks[index];
   const write = () => {
     el.title.textContent = t.title;
     el.artist.textContent = t.artist;
     el.artist.hidden = !t.artist;
     el.meta.classList.remove('swap');
   };
-  if ('mediaSession' in navigator) {
-    navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist });
-  }
   if (instant || reduceMotion.matches) return write();
   el.meta.classList.add('swap');
-  setTimeout(() => { if (shownIndex === index) write(); }, 200);
+  setTimeout(() => { if (S.shownIndex === index) write(); }, 200);
 }
 
-/* ───────── transport ───────── */
-function syncUI() {
-  document.body.classList.toggle('playing', state.playing);
-  const label = state.playing ? 'Pause' : 'Play';
-  el.recordHit.setAttribute('aria-label', label);
-  el.start.setAttribute('aria-label', label);
-  if (!drag) setMeta(state.index);
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state.playing ? 'playing' : 'paused';
+/* ───────── audio events ───────── */
+function onAudio(m) {
+  if (m.type === 'duration') {
+    if (Math.abs((S.dur[m.index] || 0) - m.duration) > 0.05) { S.dur[m.index] = m.duration; relayout(); }
+    return;
+  }
+  if (m.type !== 'pos') return;
+  audio.selected = m.index;
+  if (S.contact && !S.needSelect) {          // only a stylus that is in the groove can move the record position
+    S.rec.index = m.index;
+    S.rec.pos = m.pos;
+  }
+  if (m.edge === 'end') {
+    if (m.index < S.tracks.length - 1) {
+      audio.ensure(m.index + 1).then(() => { S.rec.index = m.index + 1; S.rec.pos = 0; audio.select(m.index + 1, 0); });
+    } else endOfSide();
+  } else if (m.edge === 'start' && m.index > 0) {
+    const prev = m.index - 1;
+    audio.ensure(prev).then((d) => { S.rec.index = prev; S.rec.pos = Math.max(0, (d || S.span[prev]) - 0.05); audio.select(prev, S.rec.pos); });
+  }
 }
 
-function startAt(index, time) {
-  const token = ++cueToken;
-  state.wait = false;
-  if (index !== state.index || !audio.getAttribute('src')) load(index);
-  try { audio.currentTime = time; } catch { /* metadata not ready yet; browser keeps it as start position */ }
-  state.onRecord = true;
-  state.playing = true;
-  syncUI();
-  seenHint();
-  const p = audio.play();
-  if (p) p.catch(() => { if (token === cueToken) { state.playing = false; syncUI(); } });
+/* ───────── arm actions ───────── */
+function pickUp() { A.mode = 'held'; A.cueRaised = false; S.contact = false; }
+function flyTo(theta, then) { A.mode = 'flying'; A.fly = { theta, then }; A.cueRaised = false; S.contact = false; }
+function park() { flyTo(THETA_REST, 'park'); }
+
+function cueTo(index, pos) {
+  S.rec = { index, pos };
+  S.needSelect = true;
+  audio.keepNear(index);
+  flyTo(thetaForRec(index, pos), 'down');
 }
 
-function pause() {
-  cueToken++;
-  state.wait = false;
-  audio.pause();
-  state.playing = false;
-  syncUI();
+function dropAt(theta) {
+  const d = dForTheta(theta);
+  if (d <= R_OUT + 5) {
+    const at = locate(Math.min(fForD(d), 0.995));
+    S.rec = at;
+    S.needSelect = true;
+    A.mode = 'down';
+    A.cueRaised = false;
+    audio.keepNear(at.index);
+  } else if (Math.abs(theta - THETA_REST) <= REST_TOLERANCE) {
+    A.mode = 'parked';
+  } else park();
 }
 
-function toRest() {
-  cueToken++;
-  state.wait = false;
-  audio.pause();
-  state.playing = false;
-  state.onRecord = false;
-  load(0);
-  syncUI();
-}
-
-function toggle() {
-  if (state.playing) return pause();
-  if (state.onRecord) return startAt(state.index, audio.currentTime || 0);
-  startAt(0, 0);
-}
-
-function skip(dir) {
-  const n = state.tracks.length;
+function autoCue() { setMotor(true); cueTo(S.rec.index, S.rec.pos); }
+function skipTo(i) {
+  const n = S.tracks.length;
   if (!n) return;
-  if (dir < 0 && state.onRecord && audio.currentTime > 3) return startAt(state.index, 0);
-  startAt((state.index + dir + n) % n, 0);
+  setMotor(true);
+  cueTo((i + n) % n, 0);
+}
+function endOfSide() {
+  if (A.mode !== 'down') return;
+  S.rec = { index: 0, pos: 0 };
+  park();
+  setMotor(false);
 }
 
-function onEnded() {
-  const next = state.index + 1;
-  if (next < state.tracks.length) return startAt(next, 0);
-  // end of the side: lift, travel back to the first groove, drop again
-  const token = ++cueToken;
-  state.wait = true;
-  load(0);
-  setTimeout(() => { if (token === cueToken) startAt(0, 0); }, 1500);
+/* ───────── motor + switch ───────── */
+function setMotor(on) {
+  S.motor = on;
+  S.sw.target = on ? SW_ON : SW_OFF;
+  el.power.setAttribute('aria-checked', String(on));
+  if (on) audio.unlock().then(() => audio.keepNear(S.rec.index));
 }
 
-audio.addEventListener('ended', onEnded);
-audio.addEventListener('play', () => { if (!state.playing && !drag) { state.playing = true; state.onRecord = true; syncUI(); } });
-audio.addEventListener('pause', () => {
-  if (audio.ended || state.wait || drag) return;
-  if (state.playing) { state.playing = false; syncUI(); }
+el.power.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  el.power.setPointerCapture(e.pointerId);
+  const r = el.power.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  S.sw.drag = { id: e.pointerId, cx, cy, ang0: Math.atan2(e.clientY - cy, e.clientX - cx), a0: S.sw.angle, moved: false, t0: performance.now() };
+  el.power.classList.add('is-grabbing');
 });
-audio.addEventListener('error', () => { if (state.playing) { state.playing = false; syncUI(); } });
+el.power.addEventListener('pointermove', (e) => {
+  const d = S.sw.drag;
+  if (!d || e.pointerId !== d.id) return;
+  const delta = wrapPi(Math.atan2(e.clientY - d.cy, e.clientX - d.cx) - d.ang0) * DEG;
+  if (Math.abs(delta) > 4) d.moved = true;
+  if (d.moved) { S.sw.angle = clamp(d.a0 + delta, SW_OFF - 6, SW_ON + 6); S.sw.vel = 0; }
+});
+const endSwitch = (e, cancel) => {
+  const d = S.sw.drag;
+  if (!d || e.pointerId !== d.id) return;
+  S.sw.drag = null;
+  el.power.classList.remove('is-grabbing');
+  if (cancel) return;
+  if (!d.moved) setMotor(!S.motor);
+  else setMotor(S.sw.angle > 0);
+};
+el.power.addEventListener('pointerup', (e) => endSwitch(e, false));
+el.power.addEventListener('pointercancel', (e) => endSwitch(e, true));
+el.power.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setMotor(!S.motor); } });
 
-let lastAria = 0;
-audio.addEventListener('timeupdate', () => {
-  const now = performance.now();
-  if (now - lastAria < 900) return;
-  lastAria = now;
-  const t = state.tracks[state.index];
-  el.armHit.setAttribute('aria-valuenow', String(Math.round(fAt(state.index, audio.currentTime) * 100)));
-  if (t) el.armHit.setAttribute('aria-valuetext', t.title);
+/* ───────── generic rotary dial (volume, speed trim) ───────── */
+function bindDial(node, { get, set, range, arc, detent = 0, label }) {
+  const rotor = node.querySelector('[class$="__rotor"]');
+  let drag = null;
+  const paint = () => {
+    const t = (get() - range[0]) / (range[1] - range[0]);
+    rotor.style.setProperty('--rot', (arc[0] + (arc[1] - arc[0]) * t).toFixed(2) + 'deg');
+    node.setAttribute('aria-valuenow', String(Math.round(label(get()))));
+  };
+  node.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    node.setPointerCapture(e.pointerId);
+    const r = node.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    drag = { id: e.pointerId, cx, cy, last: Math.atan2(e.clientY - cy, e.clientX - cx) };
+    node.classList.add('is-grabbing');
+    audio.unlock();
+  });
+  node.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const ang = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx);
+    const d = wrapPi(ang - drag.last) * DEG;
+    drag.last = ang;
+    const span = arc[1] - arc[0];
+    set(clamp(get() + (d / span) * (range[1] - range[0]), range[0], range[1]));
+    paint();
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    node.classList.remove('is-grabbing');
+    if (detent && Math.abs(get()) < detent) { set(0); paint(); }
+  };
+  node.addEventListener('pointerup', end);
+  node.addEventListener('pointercancel', end);
+  node.addEventListener('wheel', (e) => { e.preventDefault(); set(clamp(get() - Math.sign(e.deltaY) * (range[1] - range[0]) * 0.04, range[0], range[1])); paint(); }, { passive: false });
+  node.addEventListener('keydown', (e) => {
+    const step = (range[1] - range[0]) * 0.05;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') set(clamp(get() + step, range[0], range[1]));
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') set(clamp(get() - step, range[0], range[1]));
+    else return;
+    e.preventDefault();
+    paint();
+  });
+  paint();
+  return paint;
+}
+
+try { const v = parseFloat(localStorage.getItem('deck.volume')); if (v >= 0 && v <= 1) S.volume = v; } catch { /* storage unavailable */ }
+bindDial(el.volume, {
+  get: () => S.volume,
+  set: (v) => { S.volume = v; audio.setVolume(v); try { localStorage.setItem('deck.volume', v.toFixed(3)); } catch { /* ignore */ } },
+  range: [0, 1], arc: [-135, 135], label: (v) => v * 100
+});
+bindDial(el.trim, {
+  get: () => S.trim, set: (v) => { S.trim = v; },
+  range: [-1, 1], arc: [-135, 135], detent: 0.07, label: (v) => v * 6
 });
 
-if ('mediaSession' in navigator) {
-  const ms = navigator.mediaSession;
-  ms.setActionHandler('play', () => { if (!state.playing) toggle(); });
-  ms.setActionHandler('pause', () => { if (state.playing) pause(); });
-  ms.setActionHandler('nexttrack', () => skip(1));
-  ms.setActionHandler('previoustrack', () => skip(-1));
-}
-
-/* ───────── hint ───────── */
-let hintTimer = null;
-const seen = () => { try { return localStorage.getItem('deck.seen') === '1'; } catch { return false; } };
-function seenHint() {
-  clearTimeout(hintTimer);
-  el.hint.classList.remove('show');
-  try { localStorage.setItem('deck.seen', '1'); } catch { /* storage unavailable */ }
-}
-if (!seen()) hintTimer = setTimeout(() => el.hint.classList.add('show'), 1800);
-
-/* ───────── input ───────── */
-el.recordHit.addEventListener('click', toggle);
-el.start.addEventListener('click', toggle);
-el.prev.addEventListener('click', () => skip(-1));
-el.next.addEventListener('click', () => skip(1));
-
+/* ───────── record: put a finger on it ───────── */
 const toDesign = (e) => {
   const r = el.deck.getBoundingClientRect();
   const s = 1120 / r.width;
   return { x: (e.clientX - r.left) * s, y: (e.clientY - r.top) * s };
 };
 
-el.armHit.addEventListener('pointerdown', (e) => {
+el.platterHit.addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.preventDefault();
-  el.armHit.setPointerCapture(e.pointerId);
+  el.platterHit.setPointerCapture(e.pointerId);
+  audio.unlock().then(() => audio.keepNear(S.rec.index));
   const q = toDesign(e);
-  drag = {
-    id: e.pointerId, ang0: Math.atan2(q.y - P.y, q.x - P.x), theta0: arm.theta, theta: arm.theta,
-    x0: e.clientX, y0: e.clientY, moved: false, wasPlaying: state.playing
+  S.hold = {
+    id: e.pointerId, t0: performance.now(), x0: e.clientX, y0: e.clientY, active: false, travel: 0,
+    lastAng: Math.atan2(q.y - C.y, q.x - C.x), lastT: e.timeStamp, vel: 0, lastMove: performance.now()
   };
-  if (state.playing) { cueToken++; state.wait = false; audio.pause(); state.playing = false; syncUI(); }
-  el.armHit.classList.add('is-dragging');
 });
-
-el.armHit.addEventListener('pointermove', (e) => {
-  if (!drag || e.pointerId !== drag.id) return;
-  if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
-  drag.moved = true;
+el.platterHit.addEventListener('pointermove', (e) => {
+  const h = S.hold;
+  if (!h || e.pointerId !== h.id) return;
   const q = toDesign(e);
-  const ang = Math.atan2(q.y - P.y, q.x - P.x);
-  drag.theta = clamp(drag.theta0 + wrapPi(ang - drag.ang0), THETA_REST, THETA_IN);
-  const d = dForTheta(drag.theta);
-  setMeta(d <= R_OUT + 10 ? locate(fForD(d)).index : state.index);
-});
-
-function endDrag(e, cancelled) {
-  if (!drag || e.pointerId !== drag.id) return;
-  const d0 = drag;
-  drag = null;
-  el.armHit.classList.remove('is-dragging');
-  try { el.armHit.releasePointerCapture(e.pointerId); } catch { /* already released */ }
-  if (cancelled) return d0.wasPlaying ? startAt(state.index, audio.currentTime) : syncUI();
-  if (!d0.moved) {                                   // a tap on the arm behaves like start / stop
-    if (d0.wasPlaying) { state.onRecord = true; return syncUI(); }
-    return toggle();
+  const dx = q.x - C.x, dy = q.y - C.y, r = Math.hypot(dx, dy);
+  if (r < 40) return;
+  const ang = Math.atan2(dy, dx);
+  const d = wrapPi(ang - h.lastAng);
+  const dt = Math.max(4, e.timeStamp - h.lastT) / 1000;
+  h.travel += Math.abs(d) * r;
+  h.lastAng = ang; h.lastT = e.timeStamp;
+  if (!h.active && h.travel > 8) activateHold(h);
+  if (h.active) {
+    S.spin += d;
+    h.vel = h.vel * 0.5 + (d / dt) * 0.5;
+    h.lastMove = performance.now();
   }
-  const d = dForTheta(d0.theta);
-  if (d > R_OUT + 10) return toRest();
-  const at = locate(fForD(d));
-  startAt(at.index, at.time);
-}
-el.armHit.addEventListener('pointerup', (e) => endDrag(e, false));
-el.armHit.addEventListener('pointercancel', (e) => endDrag(e, true));
-
-el.armHit.addEventListener('keydown', (e) => {
-  const act = { ArrowRight: () => skip(1), ArrowDown: () => skip(1), ArrowLeft: () => skip(-1), ArrowUp: () => skip(-1), Enter: toggle, ' ': toggle }[e.key];
-  if (act) { e.preventDefault(); act(); }
 });
+function activateHold(h) {
+  h.active = true;
+  S.releaseT = 0;
+  el.platterHit.classList.add('is-grabbing');
+}
+function endHold(e, cancel) {
+  const h = S.hold;
+  if (!h || e.pointerId !== h.id) return;
+  S.hold = null;
+  el.platterHit.classList.remove('is-grabbing');
+  if (h.active) { S.releaseT = 1.4; return; }
+  if (!cancel && performance.now() - h.t0 < 240) setMotor(!S.motor);      // a tap works the switch
+}
+el.platterHit.addEventListener('pointerup', (e) => endHold(e, false));
+el.platterHit.addEventListener('pointercancel', (e) => endHold(e, true));
+
+/* ───────── tonearm: grab, lift, carry ───────── */
+el.arm.addEventListener('pointerdown', (e) => {
+  if (!e.target.classList.contains('arm-hit')) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  el.arm.setPointerCapture(e.pointerId);
+  audio.unlock().then(() => audio.keepNear(S.rec.index));
+  const q = toDesign(e);
+  S.grab = {
+    id: e.pointerId, ang0: Math.atan2(q.y - P.y, q.x - P.x), theta0: A.theta, theta: A.theta,
+    x0: e.clientX, y0: e.clientY, t0: performance.now(), moved: false, mode0: A.mode
+  };
+  pickUp();
+  el.armSvg.classList.add('is-grabbing');
+});
+el.arm.addEventListener('pointermove', (e) => {
+  const g = S.grab;
+  if (!g || e.pointerId !== g.id) return;
+  if (!g.moved && Math.hypot(e.clientX - g.x0, e.clientY - g.y0) < 6) return;
+  g.moved = true;
+  const q = toDesign(e);
+  g.theta = clamp(g.theta0 + wrapPi(Math.atan2(q.y - P.y, q.x - P.x) - g.ang0), THETA_MIN, THETA_IN);
+});
+function endGrab(e, cancel) {
+  const g = S.grab;
+  if (!g || e.pointerId !== g.id) return;
+  S.grab = null;
+  el.armSvg.classList.remove('is-grabbing');
+  if (cancel) return dropAt(g.theta);
+  if (!g.moved && performance.now() - g.t0 < 260) {          // a tap: let the deck do it
+    if (g.mode0 === 'down') park(); else autoCue();
+    return;
+  }
+  dropAt(g.theta);
+}
+el.arm.addEventListener('pointerup', (e) => endGrab(e, false));
+el.arm.addEventListener('pointercancel', (e) => endGrab(e, true));
+
+/* cue lever: lifts the arm where it is */
+let leverNudge = 0;
+const leverToggle = () => {
+  if (A.mode === 'down') A.cueRaised = !A.cueRaised;
+  else leverNudge = 7;                                      // locked while the arm is not over the record
+};
+el.armKey.addEventListener('click', () => { audio.unlock(); if (A.mode === 'down') park(); else autoCue(); });
+el.leverHit.addEventListener('pointerdown', (e) => { e.preventDefault(); audio.unlock(); leverToggle(); });
+el.lever.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); leverToggle(); } });
+
+/* track buttons + keys */
+el.prev.addEventListener('click', () => {
+  audio.unlock();
+  skipTo(A.mode === 'down' && S.rec.pos > 3 ? S.rec.index : S.rec.index - 1);
+});
+el.next.addEventListener('click', () => { audio.unlock(); skipTo(S.rec.index + 1); });
 addEventListener('keydown', (e) => {
   if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.target.closest && e.target.closest('button,a,[role="slider"],input,textarea')) return;
-  if (e.code === 'Space') { e.preventDefault(); toggle(); }
-  else if (e.key === 'ArrowRight') skip(1);
-  else if (e.key === 'ArrowLeft') skip(-1);
+  if (e.target.closest && e.target.closest('button,a,[role="slider"],[role="switch"],[role="button"],input,textarea')) return;
+  if (e.code === 'Space') { e.preventDefault(); setMotor(!S.motor); }
+  else if (e.key === 'ArrowRight') skipTo(S.rec.index + 1);
+  else if (e.key === 'ArrowLeft') skipTo(S.rec.index - 1);
 });
+addEventListener('pointerdown', () => audio.unlock(), { capture: true, passive: true });
 
-/* ───────── arm rest ───────── */
-(function buildRestPost() {
-  const s = 498;
-  const x = P.x + s * Math.cos(THETA_REST), y = P.y + s * Math.sin(THETA_REST);
-  el.restPost.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${(THETA_REST * DEG + 90).toFixed(2)})`);
-  el.restPost.innerHTML = `
-    <filter id="fPost" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.6"/></filter>
-    <rect x="-18" y="-11" width="44" height="30" rx="8" fill="#000" opacity=".5" filter="url(#fPost)"/>
-    <rect x="-22" y="-15" width="44" height="30" rx="8" fill="url(#gTube)"/>
-    <rect x="-22" y="-15" width="44" height="30" rx="8" fill="none" stroke="#000" stroke-opacity=".35"/>
-    <rect x="-13" y="-5.5" width="26" height="11" rx="5.5" fill="#141311"/>
-    <rect x="-13" y="-5.5" width="26" height="11" rx="5.5" fill="none" stroke="#fff" stroke-opacity=".1"/>`;
-})();
+/* ───────── hint ───────── */
+const seen = () => { try { return localStorage.getItem('deck.played') === '1'; } catch { return false; } };
+S.succeeded = seen();
+let hintTimer = setTimeout(() => { S.hintReady = true; }, 1800);
+function updateHint() {
+  let want = '';
+  if (!S.succeeded && S.hintReady) {
+    if (!S.motor && A.mode !== 'down') want = 'flip the switch';
+    else if (A.mode === 'parked' || A.mode === 'flying') want = 'lift the arm onto the record';
+  }
+  if (want === S.hintState) return;
+  S.hintState = want;
+  el.hint.classList.remove('show');
+  setTimeout(() => { if (S.hintState === want) { el.hint.textContent = want; if (want) el.hint.classList.add('show'); } }, 260);
+}
 
 /* ───────── frame loop ───────── */
 let last = performance.now();
-let appliedDeg = NaN, appliedLift = NaN;
+let paintedSpin = NaN, paintedTheta = NaN, paintedLift = NaN, paintedLever = NaN;
 const lamp = { tx: 0, ty: 0, x: 0, y: 0 };
 const root = document.documentElement;
-
 if (matchMedia('(pointer: fine)').matches) {
   addEventListener('pointermove', (e) => { lamp.tx = e.clientX / innerWidth - 0.5; lamp.ty = e.clientY / innerHeight - 0.5; }, { passive: true });
 }
+const spring = (o, target, k, c, dt) => {
+  const n = Math.max(1, Math.ceil(dt / 0.004)), h = dt / n;     // small steps keep the spring stable on slow frames
+  for (let i = 0; i < n; i++) { o.vel += ((target - o.angle) * k - o.vel * c) * h; o.angle += o.vel * h; }
+};
 
 function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   const still = reduceMotion.matches;
 
-  // platter: eased motor, long coast when it stops
-  const spinning = (state.playing || (drag && drag.wasPlaying)) && !still;
-  const target = spinning ? OMEGA : 0;
-  omega += (target - omega) * (1 - Math.exp(-dt / (target ? 0.9 : 1.9)));
-  if (omega > 0.004) {
-    rot = (rot + omega * dt) % (Math.PI * 2);
-    el.spin.style.transform = `rotate(${rot.toFixed(4)}rad)`;
+  /* platter */
+  const h = S.hold;
+  if (h && !h.active && now - h.t0 > 240) activateHold(h);        // a resting finger is a brake
+  if (h && h.active) {
+    if (now - h.lastMove > 100) h.vel *= Math.exp(-dt / 0.06);
+    S.omega = clamp(h.vel, -OMEGA_MAX, OMEGA_MAX);
+  } else {
+    const w0 = OMEGA0 * (1 + 0.06 * S.trim);
+    const target = S.motor ? w0 : 0;
+    const tau = S.motor ? (S.releaseT > 0 ? 0.32 : 0.55) : 1.1;
+    S.omega += (target - S.omega) * (1 - Math.exp(-dt / tau));
+    if (!S.motor) {                                           // bearing friction: it really does come to rest
+      S.omega -= Math.sign(S.omega) * 0.5 * dt;
+      if (Math.abs(S.omega) < 0.06) S.omega = 0;
+    }
+    S.spin += S.omega * dt * (still ? 0.25 : 1);
+    S.releaseT = Math.max(0, S.releaseT - dt);
   }
 
-  // tonearm
+  /* tonearm */
   let tTheta, tLift, tau;
-  if (drag) { tTheta = drag.theta; tLift = 1; tau = 0.05; }
-  else if (state.onRecord) {
-    tTheta = thetaForD(R_OUT - fAt(state.index, audio.currentTime || 0) * (R_OUT - R_IN));
-    tLift = state.playing && !state.wait ? 0 : 1;
-    tau = 0.32;
-  } else { tTheta = THETA_REST; tLift = 1; tau = 0.5; }
+  const g = S.grab;
+  if (A.mode === 'held') { tTheta = g ? g.theta : A.theta; tLift = 1; tau = 0.05; }
+  else if (A.mode === 'flying') {
+    tTheta = A.lift > 0.72 ? A.fly.theta : A.theta; tLift = 1; tau = 0.26;
+    if (Math.abs(A.theta - A.fly.theta) < 0.0035 && A.lift > 0.9) { A.mode = A.fly.then === 'down' ? 'down' : 'parked'; }
+  } else if (A.mode === 'down') {
+    tTheta = thetaForRec(S.rec.index, S.rec.pos);
+    tLift = A.cueRaised ? LIFT_CUE : 0;
+    tau = 0.07;
+  } else { tTheta = THETA_REST; tLift = LIFT_PARKED; tau = 0.3; }
   if (still) tau = 0.001;
-  arm.theta += (tTheta - arm.theta) * (1 - Math.exp(-dt / tau));
-  arm.lift += (tLift - arm.lift) * (1 - Math.exp(-dt / (still ? 0.001 : 0.22)));
-  paintArm();
+  A.theta += (tTheta - A.theta) * (1 - Math.exp(-dt / tau));
+  A.lift += (tLift - A.lift) * (1 - Math.exp(-dt / (still ? 0.001 : A.mode === 'down' && !A.cueRaised ? 0.12 : 0.16)));
 
-  // lamp follows the pointer, barely
+  /* groove → sound */
+  const contact = A.mode === 'down' && !A.cueRaised && A.lift < CONTACT;
+  S.contact = contact;
+  if (contact) {
+    const rate = S.omega / OMEGA0;
+    stepRecord(rate * dt);
+    const i = S.rec.index;
+    if (audio.isReady(i)) {
+      if (S.needSelect || audio.selected !== i) { S.needSelect = false; audio.select(i, S.rec.pos); }
+      audio.setRate(rate);
+    } else { audio.setRate(0); audio.ensure(i); }
+    if (!S.succeeded && S.motor && Math.abs(rate) > 0.5) {
+      S.succeeded = true;
+      try { localStorage.setItem('deck.played', '1'); } catch { /* ignore */ }
+    }
+  } else audio.setRate(0);
+  audio.tick();
+
+  /* controls */
+  if (!S.sw.drag) spring(S.sw, S.sw.target, 900, 36, dt);
+  S.glow += ((S.motor ? 1 : 0) - S.glow) * (1 - Math.exp(-dt / (S.motor ? 0.22 : 0.45)));
+  leverNudge *= Math.exp(-dt / 0.1);
+  const leverTarget = A.cueRaised ? LEVER.up : LEVER.down;
+  spring(S.lever, leverTarget, 520, 30, dt);
+
+  paint(still);
   if (!still) {
     lamp.x += (lamp.tx - lamp.x) * (1 - Math.exp(-dt / 0.35));
     lamp.y += (lamp.ty - lamp.y) * (1 - Math.exp(-dt / 0.35));
     root.style.setProperty('--lamp-x', (42 + lamp.x * 7).toFixed(2) + '%');
-    root.style.setProperty('--lamp-y', (40 + lamp.y * 6).toFixed(2) + '%');
+    root.style.setProperty('--lamp-y', (38 + lamp.y * 6).toFixed(2) + '%');
     el.deck.style.setProperty('--lx', (22 + lamp.x * 12).toFixed(2) + '%');
     el.deck.style.setProperty('--ly', (6 + lamp.y * 10).toFixed(2) + '%');
   }
+  updateHint();
   requestAnimationFrame(frame);
 }
 
-function paintArm() {
-  const deg = arm.theta * DEG;
-  if (Math.abs(deg - appliedDeg) < 0.003 && Math.abs(arm.lift - appliedLift) < 0.002) return;
-  appliedDeg = deg; appliedLift = arm.lift;
-  const s = 1 + 0.012 * arm.lift;
-  el.arm.setAttribute('transform', `translate(${P.x} ${P.y}) rotate(${deg.toFixed(3)}) scale(${s.toFixed(4)})`);
-  el.armShadow.setAttribute('transform', `translate(${(P.x + 8 + 16 * arm.lift).toFixed(2)} ${(P.y + 11 + 22 * arm.lift).toFixed(2)}) rotate(${deg.toFixed(3)}) scale(${s.toFixed(4)})`);
-  el.shadowBlur.setAttribute('stdDeviation', (2.4 + 4.4 * arm.lift).toFixed(2));
-  el.armHit.style.transform = `rotate(${deg.toFixed(3)}deg) translateY(-50%)`;
+/* local extrapolation between worklet position reports; the worklet is the source of truth when it speaks */
+function stepRecord(dp) {
+  const r = S.rec;
+  r.pos += dp;
+  const last = S.tracks.length - 1;
+  while (r.pos > S.span[r.index] && r.index < last) { r.pos -= S.span[r.index]; r.index++; }
+  while (r.pos < 0 && r.index > 0) { r.index--; r.pos += S.span[r.index]; }
+  if (r.pos < 0) r.pos = 0;
+  if (r.index === last && r.pos >= S.span[last] - 0.02) { r.pos = S.span[last] - 0.02; if (audio.mode !== 'worklet' || dp > 0) endOfSide(); }
+}
+
+function paint(still) {
+  if (S.spin !== paintedSpin) { paintedSpin = S.spin; el.spin.style.transform = `rotate(${(S.spin % (Math.PI * 2)).toFixed(4)}rad)`; }
+
+  const deg = A.theta * DEG;
+  if (!(Math.abs(deg - paintedTheta) <= 0.003 && Math.abs(A.lift - paintedLift) <= 0.002)) {
+    paintedTheta = deg; paintedLift = A.lift;
+    const s = 1 + 0.03 * A.lift;
+    el.arm.setAttribute('transform', `translate(${P.x} ${P.y}) rotate(${deg.toFixed(3)}) scale(${s.toFixed(4)})`);
+    el.armShadow.setAttribute('transform', `translate(${(P.x + 7 + 20 * A.lift).toFixed(2)} ${(P.y + 10 + 28 * A.lift).toFixed(2)}) rotate(${deg.toFixed(3)}) scale(${s.toFixed(4)})`);
+    armBlur.setAttribute('stdDeviation', (2.2 + 6 * A.lift).toFixed(2));
+    el.armShadow.setAttribute('opacity', (0.55 - 0.15 * A.lift).toFixed(2));
+  }
+
+  const swDeg = S.sw.angle;
+  el.powerRotor.style.setProperty('--rot', swDeg.toFixed(2) + 'deg');
+
+  const la = S.lever.angle + leverNudge;
+  if (!(Math.abs(la - paintedLever) <= 0.01)) {
+    paintedLever = la;
+    const lift = (LEVER.down - la) / (LEVER.down - LEVER.up);
+    el.leverBody.setAttribute('transform', `translate(${LEVER.x} ${LEVER.y}) rotate(${la.toFixed(2)})`);
+    el.leverShadow.setAttribute('transform', `translate(${(LEVER.x + 4 + 5 * lift).toFixed(2)} ${(LEVER.y + 6 + 7 * lift).toFixed(2)}) rotate(${la.toFixed(2)})`);
+    const a = la / DEG;
+    el.leverHit.setAttribute('d', `M${LEVER.x} ${LEVER.y}L${(LEVER.x + 84 * Math.cos(a)).toFixed(1)} ${(LEVER.y + 84 * Math.sin(a)).toFixed(1)}`);
+    el.lever.setAttribute('aria-pressed', String(A.cueRaised));
+  }
+
+  el.lamp.style.setProperty('--glow', S.glow.toFixed(3));
+
+  // caption follows the groove under the stylus (or under the finger while the arm is carried)
+  let idx = S.rec.index;
+  if (A.mode === 'held') {
+    const th = S.grab ? S.grab.theta : A.theta;
+    const d = dForTheta(th);
+    if (d <= R_OUT + 5) idx = locate(fForD(d)).index;
+  }
+  setMeta(idx);
 }
 
 /* ───────── go ───────── */
-paintArm();
-requestAnimationFrame(frame);
 loadTracks();
+paint(false);
+requestAnimationFrame(frame);
 
 const fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
 const imagesReady = Promise.all([...document.images].map((i) => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())));
-Promise.race([Promise.all([fontsReady, imagesReady]), new Promise((r) => setTimeout(r, 1200))])
+Promise.race([Promise.all([fontsReady, imagesReady]), new Promise((r) => setTimeout(r, 1500))])
   .then(() => requestAnimationFrame(() => document.body.classList.add('is-ready')));
+
+if (location.search.includes('debug')) window.__deck = { S, audio };
