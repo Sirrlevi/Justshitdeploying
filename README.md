@@ -63,12 +63,18 @@ public/fonts/     Lora (OFL), a small engraving face
 public/songs/     audio + songs.json
 ```
 
-## Static, the mascot (`src/mascot.js`)
+## Static Mk-II, the after-hours companion (`src/mascot.js`)
 
-A silent little character that lives on the page: it never talks aloud, records, or repeats the visitor. It is plain SVG/CSS/JS, so there is nothing extra to install.
+Static is a silent, draggable SVG character integrated with the real deck state. No voice output, recording, AI API, backend, or added runtime dependency is used.
 
-- It spawns at the spot where the old title used to be (about half the time) or somewhere random, then wanders. It walks around, never over, the deck, text and controls, and sits on the outer edge of the wood deck.
-- Real player state drives it: when the record plays it pulls out a mic and sings, with its mouth following the real audio level (`audio.level()` is a passive analyser tap and does not touch playback). It reacts to song changes, taps, and sleeps after 30 s of silence and no activity.
-- It teaches the controls with a glowing ring and a manga bubble, once per control, after hover/focus or on its own tour. Edit the wording in `TIPS` and `LINES` at the top of the file.
-- `prefers-reduced-motion`: it stays put and just speaks in bubbles. Keyboard: it is a focusable button.
-- Debug: open the site with `?debug` to expose `window.__static`.
+- **Opt-in onboarding:** on a fresh page view, Static offers `show me around` / `not now`. The tour never starts on its own. Dismissing the offer lets the visitor use the site normally; only the explicit button launches the step-by-step tour. The offer is per page view, so reloading shows it again.
+- **Real control guidance:** the tour points out the motor, record, tonearm, cue lever, volume, speed trim, progress line, each song selector, previous/next buttons, and social links. `watch demo` temporarily demonstrates supported controls and restores the prior value unless the visitor changes that same control while the demo is running.
+- **Character reactions:** audio-level mouth movement, a tiny microphone, singing/dancing, expressive eyes and brows, notes, curiosity, sleepy/angry/scared/dizzy reactions, random screen taps, dragging, playful object inspection and vinyl treadmill gags.
+- **Real player actions, with guardrails:** rare pranks may briefly nudge volume/speed, stop the motor, or lift the arm, then restore the prior state unless the visitor touches that control. Dragging Static onto an actual control performs that action through the existing deck API. These are scripted gags, not a language-model bot.
+- **Bubble placement:** manga-style speech cards search for a free viewport rectangle and are hidden/skipped if there is no safe position; they are not intentionally drawn over important text or controls. The bot's body also treats text and interactive controls as obstacles. Wooden deck areas remain valid perches, while the platter and hardware are collision targets.
+- **Drag physics:** pick Static up and drop it elsewhere, on the vinyl, or onto a supported control. The vinyl ride includes a low-speed treadmill gag and a high-speed dizzy/ejection animation. Object interactions are best-effort, based on the background scene's known prop regions, rather than a full 3D collision engine.
+- **Responsive and accessible:** keyboard-focusable mascot, touch-friendly drag, reduced-motion handling, and small-screen sizing.
+- **Debug:** open the site with `?debug` to expose `window.__static` and `window.__deck`.
+
+The speaking bubble is visual only: there is no spoken audio. The mouth follows the decoded song's live analysis level while music is playing and uses lightweight text-driven mouth poses for on-screen reactions. The character does not understand arbitrary natural-language prompts; its behavior is deliberately rule-based and tied to the website's controls and state.
+
