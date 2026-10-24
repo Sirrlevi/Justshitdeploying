@@ -1,6 +1,6 @@
 # Justshitdeploying
 
-A working record deck: a walnut turntable with one side of vinyl, three tracks and a real tonearm. Plain HTML/CSS/JS, no runtime dependencies.
+A working record deck: a walnut turntable with one side of vinyl, three tracks and a real tonearm, set on a dark desk. Plain HTML/CSS/JS, no runtime dependencies.
 
 ## How it behaves
 
@@ -12,6 +12,8 @@ Nothing is scripted. The platter has weight, the stylus follows the groove, and 
 - **Record**: put a finger on it to stop it, turn it either way at any speed, flick it. Backwards plays backwards.
 - **Volume** (steel knob) and **speed trim** (small dial on the arm plate, ±6%, snaps to 0).
 - Track arrows beneath the deck jump to the previous/next track. Keyboard: `Space` motor, `←` `→` tracks.
+- **Progress line** shows the real position of the stylus in the current track. Click or drag it to carry the arm to that spot and play from there (the preview follows your finger; release to drop the needle). Focus it and use `←` `→` for ±5 s.
+- **Track dots** (one per entry in `songs.json`) cue that track, just like the arrows.
 
 At the end of the side the arm lifts, returns to its rest and the motor stops.
 
@@ -37,6 +39,14 @@ npm install
 npm run dev
 npm run build   # → dist/  (Cloudflare Pages: build command `npm run build`, output `dist`)
 ```
+
+## The look
+
+The page is laid out on the 941 × 1672 reference scene (`--u` in the CSS = 1 scene unit), so the desk, header, deck and caption keep their proportions on every screen; on wide screens the scene sits centred and fades into the desk.
+
+- `public/assets/scene.webp` – the desk, props and lighting (the deck itself is drawn live on top of it)
+- `public/assets/deck.jpg` – the walnut plinth photograph the live parts sit on
+- `public/assets/grooves.webp`, `label.webp`, `sheen.webp` – the record (spins), its label (spins) and the fixed highlights that stay still while it turns
 
 ## Layout
 

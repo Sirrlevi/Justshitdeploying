@@ -18,7 +18,8 @@ const el = {
   lever: $('#lever'), leverBody: $('#leverBody'), leverShadow: $('#leverShadow'), leverHit: $('#leverHit'),
   armKey: $('#armKey'), power: $('#power'), volume: $('#volume'), trim: $('#trim'), lamp: $('#lamp'),
   prev: $('#prevBtn'), next: $('#nextBtn'),
-  meta: $('.meta'), title: $('#title'), artist: $('#artist'), hint: $('#hint')
+  meta: $('.meta'), title: $('#title'), artist: $('#artist'), hint: $('#hint'),
+  seek: $('#seek'), tCur: $('#tCur'), tDur: $('#tDur'), dots: $('#dots')
 };
 
 /* ───────── tuning ───────── */
@@ -96,6 +97,7 @@ async function loadTracks() {
   audio.tracks = S.tracks;
   relayout();
   setMeta(0, true);
+  buildDots();
   audio.setVolume(S.volume);
 }
 
@@ -536,14 +538,80 @@ function paint(still) {
   el.lamp.style.setProperty('--glow', S.glow.toFixed(3));
 
   // caption follows the groove under the stylus (or under the finger while the arm is carried)
-  let idx = S.rec.index;
+  let idx = S.rec.index, pos = S.rec.pos;
   if (A.mode === 'held') {
     const th = S.grab ? S.grab.theta : A.theta;
     const d = dForTheta(th);
-    if (d <= R_OUT + 5) idx = locate(fForD(d)).index;
+    if (d <= R_OUT + 5) { const at = locate(fForD(d)); idx = at.index; pos = at.pos; }
   }
   setMeta(idx);
+  paintTransport(idx, seekDrag ? seekDrag.pos : pos);
 }
+
+/* ───────── transport: progress + track dots (read the real record position, drive the real arm) ───────── */
+const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+let paintedT = '', paintedDot = -1, seekDrag = null;
+function buildDots() {
+  el.dots.textContent = '';
+  S.tracks.forEach((t, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'dot';
+    b.innerHTML = '<i></i><span></span>';
+    b.lastChild.textContent = t.title || `Track ${i + 1}`;
+    b.setAttribute('aria-label', `Play ${t.title || 'track ' + (i + 1)}`);
+    b.addEventListener('click', () => { audio.unlock(); skipTo(i); });
+    el.dots.appendChild(b);
+  });
+  paintedDot = -1;
+}
+function paintTransport(idx, pos) {
+  const span = S.span[idx] || 0, f = span ? clamp(pos / span, 0, 1) : 0;
+  const key = `${idx}|${fmt(pos)}|${fmt(span)}|${f.toFixed(4)}`;
+  if (key !== paintedT) {
+    paintedT = key;
+    el.seek.style.setProperty('--p', (f * 100).toFixed(2) + '%');
+    el.tCur.textContent = fmt(pos); el.tDur.textContent = fmt(span);
+    el.seek.setAttribute('aria-valuenow', String(Math.round(f * 100)));
+    el.seek.setAttribute('aria-valuetext', `${fmt(pos)} of ${fmt(span)}`);
+  }
+  if (idx !== paintedDot) {
+    paintedDot = idx;
+    el.dots.querySelectorAll('.dot').forEach((d, i) => { d.classList.toggle('is-on', i === idx); if (i === idx) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current'); });
+  }
+}
+function seekTo(i, pos) {
+  if (!S.tracks[i]) return;
+  setMotor(true);
+  cueTo(i, clamp(pos, 0, Math.max(0, (S.span[i] || 0) - 0.3)));
+}
+const seekFrac = (e) => { const r = el.seek.querySelector('.seek__bar').getBoundingClientRect(); return clamp((e.clientX - r.left) / r.width, 0, 1); };
+el.seek.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (S.shownIndex < 0) return;
+  e.preventDefault();
+  el.seek.setPointerCapture(e.pointerId);
+  audio.unlock();
+  seekDrag = { id: e.pointerId, idx: S.shownIndex, pos: seekFrac(e) * (S.span[S.shownIndex] || 0) };
+  el.seek.classList.add('is-drag');
+});
+el.seek.addEventListener('pointermove', (e) => {
+  if (seekDrag && e.pointerId === seekDrag.id) seekDrag.pos = seekFrac(e) * (S.span[seekDrag.idx] || 0);
+});
+const endSeek = (e, cancel) => {
+  if (!seekDrag || e.pointerId !== seekDrag.id) return;
+  const d = seekDrag; seekDrag = null;
+  el.seek.classList.remove('is-drag');
+  if (!cancel) seekTo(d.idx, d.pos);
+};
+el.seek.addEventListener('pointerup', (e) => endSeek(e, false));
+el.seek.addEventListener('pointercancel', (e) => endSeek(e, true));
+el.seek.addEventListener('keydown', (e) => {
+  const step = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 5 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -5 : 0;
+  if (!step) return;
+  e.preventDefault();
+  audio.unlock();
+  seekTo(S.rec.index, S.rec.pos + step);
+});
 
 /* ───────── go ───────── */
 loadTracks();

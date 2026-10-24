@@ -12,11 +12,19 @@
   <title>mentallyfuckedup</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="/fonts/lora-italic.woff" as="font" type="font/woff" crossorigin>
-  <link rel="preload" href="/assets/walnut.jpg" as="image">
+  <link rel="preload" href="/assets/scene.webp" as="image">
+  <link rel="preload" href="/assets/deck.jpg" as="image">
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
   <main class="stage">
+   <div class="scene" id="scene">
+    <img class="scene__bg" src="/assets/scene.webp" alt="" draggable="false" width="941" height="1672">
+    <header class="masthead">
+      <h1 class="domain">mentallyfuckedup.in</h1>
+      <p class="sub">music / notes</p>
+    </header>
+
     <div class="deck-fit" id="deckFit">
       <div class="deck" id="deck">
 
@@ -128,6 +136,11 @@
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 6.5 15 12l-5.5 5.5"/></svg>
         </button>
       </div>
+      <div class="seek" id="seek" role="slider" tabindex="0" aria-label="Track position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="seek__bar"><i class="seek__fill"></i><i class="seek__knob"></i></div>
+        <span class="seek__t" id="tCur">0:00</span><span class="seek__t" id="tDur">0:00</span>
+      </div>
+      <nav class="dots" id="dots" aria-label="Tracks"></nav>
       <p class="hint" id="hint"></p>
       <div class="foot">
         <p class="tagline">{ i write code &amp; collect music. }</p>
@@ -138,6 +151,7 @@
         </nav>
       </div>
     </footer>
+   </div>
   </main>
 
   <script type="module" src="/src/main.js"></script>
