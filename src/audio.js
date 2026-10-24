@@ -52,6 +52,7 @@ export class DeckAudio {
       this.gain = this.ctx.createGain();
       this.gain.gain.value = this.volume * this.volume;
       this.node.connect(this.gain).connect(this.ctx.destination);
+      this.an = this.ctx.createAnalyser(); this.an.fftSize = 512; this.node.connect(this.an); this.abuf = new Uint8Array(this.an.fftSize);   // passive tap for the mascot's lip-sync
       this.node.port.onmessage = (e) => { const m = e.data; if (m.type === 'pos' && m.seq === this.seq) this.onEvent(m); };
       if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => {});
       this.mode = 'worklet';
@@ -133,6 +134,12 @@ export class DeckAudio {
     }
   }
 
+  level() {
+    if (!this.an) return 0;
+    this.an.getByteTimeDomainData(this.abuf);
+    let s = 0; for (let i = 0; i < this.abuf.length; i++) { const v = (this.abuf[i] - 128) / 128; s += v * v; }
+    return Math.min(1, Math.sqrt(s / this.abuf.length) * 3.4);
+  }
   setVolume(v) {
     this.volume = v;
     const g = v * v;

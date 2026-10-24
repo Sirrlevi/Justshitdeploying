@@ -62,3 +62,13 @@ public/assets/    walnut, frame, label and groove textures, favicon
 public/fonts/     Lora (OFL), a small engraving face
 public/songs/     audio + songs.json
 ```
+
+## Static, the mascot (`src/mascot.js`)
+
+A silent little character that lives on the page: it never talks aloud, records, or repeats the visitor. It is plain SVG/CSS/JS, so there is nothing extra to install.
+
+- It spawns at the spot where the old title used to be (about half the time) or somewhere random, then wanders. It walks around, never over, the deck, text and controls, and sits on the outer edge of the wood deck.
+- Real player state drives it: when the record plays it pulls out a mic and sings, with its mouth following the real audio level (`audio.level()` is a passive analyser tap and does not touch playback). It reacts to song changes, taps, and sleeps after 30 s of silence and no activity.
+- It teaches the controls with a glowing ring and a manga bubble, once per control, after hover/focus or on its own tour. Edit the wording in `TIPS` and `LINES` at the top of the file.
+- `prefers-reduced-motion`: it stays put and just speaks in bubbles. Keyboard: it is a focusable button.
+- Debug: open the site with `?debug` to expose `window.__static`.

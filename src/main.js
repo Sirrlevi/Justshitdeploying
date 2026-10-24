@@ -6,6 +6,7 @@ import {
   thetaForD, dForTheta, fForD, dForF
 } from './geom.js';
 import { DeckAudio } from './audio.js';
+import { initMascot } from './mascot.js';
 import { buildArm, buildDecor, buildLever, buildTicks, LEVER, LEVER_SIL } from './parts.js';
 
 const $ = (s) => document.querySelector(s);
@@ -621,6 +622,7 @@ requestAnimationFrame(frame);
 const fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
 const imagesReady = Promise.all([...document.images].map((i) => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())));
 Promise.race([Promise.all([fontsReady, imagesReady]), new Promise((r) => setTimeout(r, 1500))])
-  .then(() => requestAnimationFrame(() => document.body.classList.add('is-ready')));
+  .then(() => requestAnimationFrame(() => document.body.classList.add('is-ready')))
+  .then(() => setTimeout(() => initMascot(S, audio), 1400));   // after the deck has settled, so it never perches on a moving edge
 
 if (location.search.includes('debug')) window.__deck = { S, audio };
