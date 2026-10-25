@@ -63,18 +63,12 @@ public/fonts/     Lora (OFL), a small engraving face
 public/songs/     audio + songs.json
 ```
 
-## Static Mk-II, the after-hours companion (`src/mascot.js`)
+## Static, the mascot (`src/mascot.js`)
 
-Static is a silent, draggable SVG character integrated with the real deck state. No voice output, recording, AI API, backend, or added runtime dependency is used.
+A silent little character that lives on the page (no mic, no speech, no network; plain SVG/CSS/JS). It is a physical object in your page: drag it with a finger, fling it, drop it on the record.
 
-- **Opt-in onboarding:** on a fresh page view, Static offers `show me around` / `not now`. The tour never starts on its own. Dismissing the offer lets the visitor use the site normally; only the explicit button launches the step-by-step tour. The offer is per page view, so reloading shows it again.
-- **Real control guidance:** the tour points out the motor, record, tonearm, cue lever, volume, speed trim, progress line, each song selector, previous/next buttons, and social links. `watch demo` temporarily demonstrates supported controls and restores the prior value unless the visitor changes that same control while the demo is running.
-- **Character reactions:** audio-level mouth movement, a tiny microphone, singing/dancing, expressive eyes and brows, notes, curiosity, sleepy/angry/scared/dizzy reactions, random screen taps, dragging, playful object inspection and vinyl treadmill gags.
-- **Real player actions, with guardrails:** rare pranks may briefly nudge volume/speed, stop the motor, or lift the arm, then restore the prior state unless the visitor touches that control. Dragging Static onto an actual control performs that action through the existing deck API. These are scripted gags, not a language-model bot.
-- **Bubble placement:** manga-style speech cards search for a free viewport rectangle and are hidden/skipped if there is no safe position; they are not intentionally drawn over important text or controls. The bot's body also treats text and interactive controls as obstacles. Wooden deck areas remain valid perches, while the platter and hardware are collision targets.
-- **Drag physics:** pick Static up and drop it elsewhere, on the vinyl, or onto a supported control. The vinyl ride includes a low-speed treadmill gag and a high-speed dizzy/ejection animation. Object interactions are best-effort, based on the background scene's known prop regions, rather than a full 3D collision engine.
-- **Responsive and accessible:** keyboard-focusable mascot, touch-friendly drag, reduced-motion handling, and small-screen sizing.
-- **Debug:** open the site with `?debug` to expose `window.__static` and `window.__deck`.
-
-The speaking bubble is visual only: there is no spoken audio. The mouth follows the decoded song's live analysis level while music is playing and uses lightweight text-driven mouth poses for on-screen reactions. The character does not understand arbitrary natural-language prompts; its behavior is deliberately rule-based and tied to the website's controls and state.
-
+- **Tour, only when asked.** On every load it shows a small "want a quick tour?" chip. Nothing starts by itself. On "yes" the bot hops to each control and operates the real thing (power switch, needle lever, volume knob, seek line, song dots) while explaining it; "stop" ends it. Edit the steps in `STEPS`.
+- **Carry and throw.** Picking it up makes it panic like a carried character. Letting go gives it gravity: it lands on the deck, text, the mug, headphones, plant and books (the `PROPS` list maps those photo props to boxes), bounces, shouts a line about what it hit, and gets dizzy (birds) after a hard fall. Dropping it on the record makes it ride the platter: slow = treadmill run then a dizzy tumble, full speed = it struggles and is flung off.
+- **Mischief, always undone.** Now and then, while a song plays, it stops the motor, lifts the needle, drops or blasts the volume, or twists the speed trim, then puts everything back. It also dances, gets angry (censored swearing), sings with a mic (mouth follows `audio.level()`), pokes where you tap the screen, sleeps when idle, and sometimes appears where the old title was.
+- Dialogue lives in `LINES` (shuffle-bag, so lines don't repeat back to back).
+- `prefers-reduced-motion`: no wandering, pranks or disc rides; it stays put. Keyboard: it is a focusable button. Add `?debug` to the URL to expose `window.__static`.

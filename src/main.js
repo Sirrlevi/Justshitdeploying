@@ -266,13 +266,12 @@ function bindDial(node, { get, set, range, arc, detent = 0, label }) {
 }
 
 try { const v = parseFloat(localStorage.getItem('deck.volume')); if (v >= 0 && v <= 1) S.volume = v; } catch { /* storage unavailable */ }
-let paintVolumeDial = () => {}, paintTrimDial = () => {};
-paintVolumeDial = bindDial(el.volume, {
+bindDial(el.volume, {
   get: () => S.volume,
   set: (v) => { S.volume = v; audio.setVolume(v); try { localStorage.setItem('deck.volume', v.toFixed(3)); } catch { /* ignore */ } },
   range: [0, 1], arc: [-135, 135], label: (v) => v * 100
 });
-paintTrimDial = bindDial(el.trim, {
+bindDial(el.trim, {
   get: () => S.trim, set: (v) => { S.trim = v; },
   range: [-1, 1], arc: [-135, 135], detent: 0.07, label: (v) => v * 6
 });
@@ -557,7 +556,7 @@ function buildDots() {
   el.dots.textContent = '';
   S.tracks.forEach((t, i) => {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'dot'; b.dataset.index = String(i);
+    b.type = 'button'; b.className = 'dot';
     b.innerHTML = '<i></i><span></span>';
     b.lastChild.textContent = t.title || `Track ${i + 1}`;
     b.setAttribute('aria-label', `Play ${t.title || 'track ' + (i + 1)}`);
@@ -624,21 +623,6 @@ const fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready
 const imagesReady = Promise.all([...document.images].map((i) => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())));
 Promise.race([Promise.all([fontsReady, imagesReady]), new Promise((r) => setTimeout(r, 1500))])
   .then(() => requestAnimationFrame(() => document.body.classList.add('is-ready')))
-  .then(() => setTimeout(() => initMascot(S, audio, {
-    setMotor,
-    toggleMotor: () => setMotor(!S.motor),
-    toggleLever: leverToggle,
-    toggleArm: () => { if (A.mode === 'down') park(); else autoCue(); },
-    getArmDown: () => A.mode === 'down',
-    skipTo,
-    setVolume: (value) => {
-      S.volume = clamp(value, 0, 1); audio.setVolume(S.volume); paintVolumeDial();
-      try { localStorage.setItem('deck.volume', S.volume.toFixed(3)); } catch { /* ignore */ }
-    },
-    getVolume: () => S.volume,
-    setTrim: (value) => { S.trim = clamp(value, -1, 1); paintTrimDial(); },
-    getTrim: () => S.trim,
-    getMotor: () => S.motor
-  }), 1400));   // after the deck has settled, so Static never lands on a control by default
+  .then(() => setTimeout(() => initMascot(S, audio, { setMotor, park, autoCue, skipTo, cueTo, setVolume: (v) => { S.volume = v; audio.setVolume(v); }, setTrim: (v) => { S.trim = v; } }), 1400));   // after the deck has settled, so it never perches on a moving edge
 
 if (location.search.includes('debug')) window.__deck = { S, audio };
