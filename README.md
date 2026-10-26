@@ -63,22 +63,22 @@ public/fonts/     Lora (OFL), a small engraving face
 public/songs/     audio + songs.json
 ```
 
-## Static, the mascot (`src/mascot.js`)
+## @Thinking mascot (`src/mascot.js`)
 
-A silent little pet that lives on the page (no mic, no speech, no network; plain SVG/CSS/JS). It reacts to how you treat it.
+A local SVG/CSS/JS companion. It has no database and does not send guide preferences to a server; settings are saved in the visitor's browser with `localStorage`.
 
-- **Tour, only when asked.** Each load shows a small "want a quick tour?" chip; nothing starts by itself (it says "again?" once you have finished it, remembered in `localStorage` as `static.guide`). The small **?** badge next to the bot replays one section (power, needle, volume, seek, songs). During a tour the bot walks up to each real control, takes hold with both hands, strains for a random time (sometimes it slips and retries) and the real control moves with it. Edit the steps in `STEPS`.
-- **Touch.** Tap = poke (fast repeated taps hurt and make it angry). Hold still or stroke slowly = petting (blush, hearts, purring). Too many hard taps and it turns red, grows horns and goes into a monster tantrum: swears (censored), slams the power switch, yanks the lever, shakes the record, then calms down and puts everything back. Drag = pick it up (it panics) and fling it: gravity, bounces on the deck, text, mug, headphones, plant and books (`PROPS`), dizzy birds after a hard fall.
-- **The record.** Drop it on a stopped record and it just stands there. On a spinning one it tries to keep its balance: it runs against the spin (treadmill) near the centre, and at full speed it runs along, wobbles and gets flung off, after a different time every attempt (`mkDisc` randomises skill, grace and stamina). It also lifts the real record with both hands, inspects, spins and tosses it, then puts it back.
-- **Music.** With a song playing it performs instead of standing still: mic (only sometimes), dance, headbang, spin, jumps, struts around the page. Its mouth follows `audio.level()`. If you stop a song it was vibing to, it swears (censored), shows you the finger, and puts the song back on itself.
-- **Mischief, always undone.** About every 20-50 s while music plays it stops the motor, lifts the needle, drops or blasts the volume, twists the speed trim or skips a track, then puts it back. Tune the timing at `prankAt` in `decide`.
-- Dialogue lives in `LINES` (shuffle-bag, no repeats back to back). Bubbles are soft floating clouds; tap one to dismiss it.
-- `prefers-reduced-motion`: no wandering, pranks or rides. Keyboard: it is a focusable button. Add `?debug` to the URL to expose `window.__static`.
+- **Guide prompt:** The welcome prompt appears only when the visitor has not chosen. `yes!` and `no thanks` are remembered on that browser. To replay it later, hold the mascot for about 1.75 seconds (or use the mouse context menu / keyboard `Shift+F10`) and choose **guide again**.
+- **Mascot settings:** The same menu offers quiet mode, reduced motion and hide/show controls. Hide/show and the two preferences are local to that browser. `Escape` closes the menu.
+- **Touch:** Tap to interact; hold still to pet; drag to carry and fling. Fast repeated taps can trigger the deliberately dramatic tantrum behavior. The existing guided demo and character reactions that operate player controls are retained.
+- **Movement:** The mascot navigates open space, uses the transformed SVG coordinates for reaches, and checks the rendered hand position before making nearby text wobble. Speech waits through punctuation and leaves a reading pause; active dialogue is not replaced by quick reactions.
+- **Music:** The mouth follows the player's real audio level when a song is audible. During silence it does not fake lip-sync. Music mode, sleep/wake, expressions, short gestures and physics remain part of the character.
+- **Reduced motion:** The system preference is respected, and visitors can save a reduced-motion choice in the settings menu. This tones down mascot-only motion without adding a server or database.
+- Dialogue lives in `LINES`. Add `?debug` to the URL to expose `window.__static` for troubleshooting.
 
-## Mascot v7 polish pass
+### Mascot v7 polish
 
-- Guide acceptance/rejection is saved on the visitor’s device with `localStorage` (`static.guide.choice.v1`); it is not stored on a server.
-- The floating `?` shortcut and unsolicited idle switch/volume/speed pranks are removed.
-- Speech uses slower character timing and a minimum reading pause; quick reactions do not replace an active line.
-- Mascot reach/approach uses nearby target geometry and mirrored arm coordinates to reduce distant pointing and false contact.
-- Waking clears sleep immediately, and interrupted actions reset transient face/arm/mouth states.
+- The floating `?` shortcut was removed. Guide acceptance/rejection persists as `static.guide.choice.v1`.
+- Bubble typing and reading time are slower, and fast reactions cannot overwrite active speech.
+- Pointer/reach calculations use the transformed mascot body and the actual rendered hand for contact checks.
+- Animation interruptions run a recovery path so transient arm, mouth and movement state does not remain stuck.
+- Mascot CSS has one consolidated component section, with viewport-aware bubbles and a safe-area-aware restore button on mobile.

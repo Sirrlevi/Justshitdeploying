@@ -54,6 +54,7 @@ const SVG = `<svg viewBox="-20 -14 140 140" aria-hidden="true" focusable="false"
 <ellipse cx="22" cy="68" rx="6.5" ry="4" fill="#e59a78" style="opacity:var(--bl,.35)"/><ellipse cx="78" cy="68" rx="6.5" ry="4" fill="#e59a78" style="opacity:var(--bl,.35)"/>
 <circle cx="50" cy="97" r="11" fill="url(#se)" stroke="#6e5530"/><circle cx="50" cy="97" r="3.4" fill="#2a1d12"/><circle cx="46" cy="92.5" r="1.8" fill="#fff" opacity=".7"/>
 ${['el', 'er'].map((c) => `<g class="${c}"><ellipse rx="10" ry="13" fill="url(#se)" stroke="#6e5530"/><ellipse class="pp" rx="4.8" ry="6.8" fill="#24180e"/><circle cx="-3" cy="-4.5" r="2.2" fill="#fff" opacity=".92"/><circle cx="2.6" cy="3" r="1" fill="#fff" opacity=".6"/></g>`).join('')}
+<path class="ebl" d="M24 29Q34 24 44 29" fill="none" stroke="#d9b47a" stroke-width="3" stroke-linecap="round" opacity=".76"/><path class="ebr" d="M56 29Q66 24 76 29" fill="none" stroke="#d9b47a" stroke-width="3" stroke-linecap="round" opacity=".76"/>
 <path class="mo" fill="${INK}" stroke="${BR}" stroke-width="1.4" stroke-linejoin="round"/>
 <g class="mn" opacity="0"><path d="M17 22L7-4L35 12Z" fill="#eadcb4" stroke="#5a4730" stroke-width="1.5"/><path d="M83 22L93-4L65 12Z" fill="#eadcb4" stroke="#5a4730" stroke-width="1.5"/><path d="M20 30L45 41M80 30L55 41" stroke="#1d140e" stroke-width="6" stroke-linecap="round"/><path d="M39 79h5l-2.5 9zM56 79h5l-2.5 9z" fill="#fff"/></g>
 <line class="al" stroke="#4e4136" stroke-width="11" stroke-linecap="round"/><line class="al2" stroke="#9a8570" stroke-width="3.6" stroke-linecap="round" opacity=".55"/><circle class="hl" r="8" fill="url(#sh2)" stroke="${BR}" stroke-width="1.5"/>
@@ -66,17 +67,29 @@ const visemeOf = (c) => ('aeiy'.includes(c) ? [.85, .9] : 'ou'.includes(c) ? [.8
 const star = (cx, cy, rx, ry, st) => { let p = ''; for (let i = 0; i < 24; i++) { const a = (i / 24) * TAU, k = i % 2 ? 1 : 1.16; p += `${cx + Math.cos(a) * rx * k},${cy + Math.sin(a) * ry * k} `; } return `<polygon points="${p}" ${st}/>`; };
 
 export function initMascot(S, audio, api) {
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches, ac = new AbortController();
+  const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  const readPref = (key, fallback = '') => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
+  const writePref = (key, value) => { try { localStorage.setItem(key, value); } catch { /* local-only preference storage may be unavailable */ } };
+  let reduce = motionQuery.matches || readPref('thinking.reduceMotion') === '1';
+  let quietMode = readPref('thinking.quiet') === '1';
+  let hiddenByUser = readPref('thinking.hidden') === '1';
+  const ac = new AbortController();
   const on = (t, e, f, o) => t.addEventListener(e, f, { signal: ac.signal, ...o });
   const btn = Object.assign(document.createElement('button'), { className: 'stm', type: 'button', innerHTML: SVG });
-  btn.setAttribute('aria-label', 'Static, the little mascot. Tap to poke it, or drag to carry it.');
+  btn.setAttribute('aria-label', '@Thinking. Tap to interact, drag to carry, or press and hold for settings.');
+  btn.setAttribute('aria-description', 'Hold for mascot settings and guide options.');
+  if (hiddenByUser) { btn.classList.add('user-hidden'); btn.setAttribute('aria-hidden', 'true'); btn.tabIndex = -1; }
   const bub = Object.assign(document.createElement('div'), { className: 'mbub', hidden: true, innerHTML: '<svg></svg><div class="mtx"><b></b><i></i></div>' });
   bub.setAttribute('role', 'status');
   const ring = Object.assign(document.createElement('div'), { className: 'mring', hidden: true });
-  document.body.append(ring, bub, btn);
-  const q = (c) => btn.querySelector('.' + c), E = Object.fromEntries('bd sh fl fr an bu el er mo al al2 hl ar ar2 hr mc bi fg mn'.split(' ').map((c) => [c, q(c)]));
+  const launcher = Object.assign(document.createElement('button'), { className: 'mrestore', type: 'button', textContent: 'show @Thinking', hidden: !hiddenByUser });
+  launcher.setAttribute('aria-label', 'Show @Thinking mascot');
+  document.body.append(ring, bub, btn, launcher);
+  const q = (c) => btn.querySelector('.' + c), E = Object.fromEntries('bd sh fl fr an bu el er ebl ebr mo al al2 hl ar ar2 hr mc bi fg mn'.split(' ').map((c) => [c, q(c)]));
+  btn.classList.toggle('motion-reduced', reduce);
+  document.documentElement.classList.toggle('thinking-reduced-motion', reduce);
   const pps = btn.querySelectorAll('.pp'), bsvg = bub.querySelector('svg'), tt = bub.querySelector('b'), gg = bub.querySelector('i');
-  let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, bubbleSeq = 0, speechBusy = false, noteT = 0, told = new Set(), queue = [], lastIdx = S.rec.index, needleT = 0, tapN = 0, welcomed = false, tourT = performance.now() + 9000, mx = -1, my = -1;
+  let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, bubbleSeq = 0, speechBusy = false, queue = [], lastIdx = S.rec.index, tapN = 0, welcomed = false, mx = -1, my = -1, actionState = 'boot';
   const M = { mad: 0, pet: 0, petting: 0, eff: 0, grip: null, fing: 0, mon: 0, mode: 'walk', vx: 0, vy: 0, vr: 0, rot: 0, sq: 0, peak: 0, dizzy: 0, wide: 0, hx: 0, hy: 0, jp: null, dc: null, dance: 0, struggle: 0, sway: 0, run: 0, x: 0, y: 0, face: 1, pop: 0, ph: 0, mic: 0, micT: 0, o: 0, ot: 0, w: .5, wt: .5, lx: 0, ly: 0, nb: 2, bl: 0, sleep: 0, sit: 0, sp: 0, glad: 0, go: null, tgt: null, hold: 0,
     L: { a: 102, l: 22, ta: 102, tl: 22 }, Rm: { a: 78, l: 22, ta: 78, tl: 22 } };
   const REST = [[102, 22], [78, 22]], arms = (l, r) => { if (l) [M.L.ta, M.L.tl] = l; if (r) [M.Rm.ta, M.Rm.tl] = r; };
@@ -143,9 +156,16 @@ export function initMascot(S, audio, api) {
     return best;
   }
   function place() {
-    const { w, h, kind } = B, m = 26, p = bestSpot(w, h, kind === 'think' ? 46 : 18); Object.assign(B, { x: p.x, y: p.y, px: M.x, py: M.y });
-    const tip = { x: cl(p.x + w / 2, M.x - BW - 7, M.x + BW + 7) - p.x + m, y: cl(p.y + h / 2, M.y - BH - 7, M.y + 7) - p.y + m };   // tail stops on a margin around the bot: it never touches the face
-    bsvg.setAttribute('width', w + 2 * m); bsvg.setAttribute('height', h + 2 * m); bsvg.innerHTML = shape(kind, w, h, tip); bub.style.transform = `translate(${p.x - m}px,${p.y - m}px)`;
+    if (!B) return;
+    // Re-measure after rotation/resizing because a narrower viewport changes text wrapping.
+    const kind = B.kind, m = 26, textBox = bub.querySelector('.mtx'), w = textBox.offsetWidth, h = textBox.offsetHeight;
+    B.w = w; B.h = h;
+    // Place the complete SVG bubble, including its decorative margin, inside the viewport.
+    const outer = bestSpot(w + 2 * m, h + 2 * m, kind === 'think' ? 46 : 18);
+    const p = { x: outer.x + m, y: outer.y + m };
+    Object.assign(B, { x: p.x, y: p.y, px: M.x, py: M.y });
+    const tip = { x: cl(p.x + w / 2, M.x - BW - 7, M.x + BW + 7) - p.x + m, y: cl(p.y + h / 2, M.y - BH - 7, M.y + 7) - p.y + m };
+    bsvg.setAttribute('width', w + 2 * m); bsvg.setAttribute('height', h + 2 * m); bsvg.innerHTML = shape(kind, w, h, tip); bub.style.transform = `translate(${outer.x}px,${outer.y}px)`;
   }
   function show(text, kind) {
     clearTimeout(ht); ht = 0;
@@ -186,13 +206,14 @@ export function initMascot(S, audio, api) {
   }
 
   /* ── behaviours ── */
-  const notes = () => { if (reduce) return; const e = Object.assign(document.createElement('span'), { className: 'mn', textContent: pick(['♪', '♫']) }); const r = E.hr.getBoundingClientRect(); e.style.cssText = `left:${r.left + R(-10, 14)}px;top:${r.top - 10}px;--dx:${R(-22, 22)}px;--r:${R(-25, 25)}deg`; document.body.append(e); e.onanimationend = () => e.remove(); };
-  const hearts = () => { if (reduce) return; const e = Object.assign(document.createElement('span'), { className: 'mn mh', textContent: '♥' }), r = btn.getBoundingClientRect(); e.style.cssText = `left:${r.left + R(r.width * .2, r.width * .8)}px;top:${r.top + 4}px;--dx:${R(-18, 18)}px;--r:${R(-20, 20)}deg`; document.body.append(e); e.onanimationend = () => e.remove(); };
+  const notes = () => { if (reduce || quietMode || hiddenByUser) return; const e = Object.assign(document.createElement('span'), { className: 'mn', textContent: pick(['♪', '♫']) }); const r = E.hr.getBoundingClientRect(); e.style.cssText = `left:${r.left + R(-10, 14)}px;top:${r.top - 10}px;--dx:${R(-22, 22)}px;--r:${R(-25, 25)}deg`; document.body.append(e); e.onanimationend = () => e.remove(); };
+  const hearts = () => { if (reduce || quietMode || hiddenByUser) return; const e = Object.assign(document.createElement('span'), { className: 'mn mh', textContent: '♥' }), r = btn.getBoundingClientRect(); e.style.cssText = `left:${r.left + R(r.width * .2, r.width * .8)}px;top:${r.top + 4}px;--dx:${R(-18, 18)}px;--r:${R(-20, 20)}deg`; document.body.append(e); e.onanimationend = () => e.remove(); };
   async function perform(g) {
     M.micT = 0; let first = true, moved = true;
     while (playing) {
-      const mv = first && Math.random() < .5 ? 'mic' : reduce ? pick(['mic', 'dance']) : !moved && Math.random() < .8 ? pick(['strut', 'jump', 'groove', 'strut']) : pick(['mic', 'dance', 'dance', 'strut', 'jump', 'spin', 'bang', 'groove']); first = false; moved = mv === 'strut' || mv === 'jump' || mv === 'groove';   // never parked in one spot for long
-      if (mv === 'mic') { M.micT = 1; arms([-40, 24], [138, 30]); M.sway = 1; for (let i = 0, n = 4 + ((R(0, 5)) | 0); playing && i < n; i++) { arms([-50 + Math.sin(performance.now() / 380) * 22, 24], null); if (Math.random() < .55) notes(); await wait(520, g); } M.sway = 0; M.micT = 0; }
+      const mv = reduce ? 'rest' : first && Math.random() < .5 ? 'mic' : !moved && Math.random() < .8 ? pick(['strut', 'jump', 'groove', 'strut']) : pick(['mic', 'dance', 'dance', 'strut', 'jump', 'spin', 'bang', 'groove']); first = false; moved = mv === 'strut' || mv === 'jump' || mv === 'groove';   // never parked in one spot for long
+      if (mv === 'rest') { M.micT = 0; M.dance = 0; await wait(1000, g); }
+      else if (mv === 'mic') { M.micT = 1; arms([-40, 24], [138, 30]); M.sway = 1; for (let i = 0, n = 4 + ((R(0, 5)) | 0); playing && i < n; i++) { arms([-50 + Math.sin(performance.now() / 380) * 22, 24], null); if (Math.random() < .55) notes(); await wait(520, g); } M.sway = 0; M.micT = 0; }
       else if (mv === 'dance') { M.dance = pick([1, 2, 3]); await wait(R(2500, 4800), g); M.dance = 0; }
       else if (mv === 'bang') { M.dance = 4; await wait(R(2600, 4200), g); M.dance = 0; }
       else if (mv === 'spin') { M.dance = 1; for (let i = 0; i < 3 && playing; i++) { M.sp = 1; await wait(950, g); } M.dance = 0; }
@@ -223,15 +244,27 @@ export function initMascot(S, audio, api) {
     const ty = cl(cy, r.top + Math.min(5, r.height / 2), r.bottom - Math.min(5, r.height / 2));
     return { r, tx, ty, s: nearTo(tx, ty, 0) };
   };
+  const screenToBody = (x, y) => {
+    try {
+      const ctm = E.bd.getScreenCTM();
+      if (ctm) { const pt = btn.querySelector('svg').createSVGPoint(); pt.x = x; pt.y = y; const p = pt.matrixTransform(ctm.inverse()); return { x: p.x, y: p.y }; }
+    } catch { /* use the geometric fallback on older SVG engines */ }
+    const u = size / 140; return { x: 50 + ((x - M.x) / u) * M.face, y: 118 + (y - M.y) / u };
+  };
+  const armPoseTo = (pt, shoulderX) => {
+    const p = screenToBody(pt.x, pt.y), dx = p.x - shoulderX, dy = p.y - 68;
+    return [Math.atan2(dy, dx) * 180 / Math.PI, Math.hypot(dx, dy)];
+  };
   const reach = (tx, ty, max = 52) => {
-    const u = size / 140, ax = M.x + 38 * u * M.face, ay = M.y - 50 * u;
-    const dx = (tx - ax) * M.face, dy = ty - ay;
-    const d = Math.hypot(dx, dy) / u, a = Math.atan2(dy, dx) * 180 / Math.PI;
-    arms(null, [a, cl(d, 18, max)]); M.tgt = { x: tx, y: ty };
+    const pose = armPoseTo({ x: tx, y: ty }, 88);
+    arms(null, [pose[0], cl(pose[1], 18, max)]); M.tgt = { x: tx, y: ty };
   };
   const handPoint = () => {
-    const u = size / 140, a = M.Rm.a * Math.PI / 180;
-    return { x: M.x + (38 + Math.cos(a) * M.Rm.l) * M.face * u, y: M.y + (-50 + Math.sin(a) * M.Rm.l) * u };
+    const r = E.hr.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+  const handTouches = (r, pad = 7) => {
+    const h = handPoint(); return h.x >= r.left - pad && h.x <= r.right + pad && h.y >= r.top - pad && h.y <= r.bottom + pad;
   };
   const ringOn = (r) => { Object.assign(ring.style, { left: r.left - 6 + 'px', top: r.top - 6 + 'px', width: r.width + 12 + 'px', height: r.height + 12 + 'px' }); ring.hidden = false; };
   const hop = (x, y, g, ms = 650) => new Promise((res, rej) => { M.mode = 'jump'; M.jp = { x0: M.x, y0: M.y, x1: x, y1: y, t: 0, ms: reduce ? 60 : ms, res, rej, g, h: Math.min(150, 58 + Math.hypot(x - M.x, y - M.y) * .14) }; });
@@ -239,7 +272,12 @@ export function initMascot(S, audio, api) {
   const chip = Object.assign(document.createElement('div'), { className: 'mchip', hidden: true }); document.body.append(chip);
   const hideChip = () => { chip.hidden = true; chipExp = 0; };
   const placeChip = () => { if (chip.hidden) return; const p = bestSpot(chip.offsetWidth, chip.offsetHeight, 10); chipP = { x: M.x, y: M.y }; chip.style.transform = `translate(${p.x}px,${p.y}px)`; };
-  const setChip = (text, btns, ms = 0) => { chip.hidden = false; chip.textContent = ''; const s = document.createElement('span'); s.textContent = text; chip.append(s); btns.forEach(([t, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = (e) => { e.stopPropagation(); f(); }; chip.append(b); }); chipExp = ms ? performance.now() + ms : 0; placeChip(); };
+  const setChip = (text, btns, ms = 0, options = false) => {
+    chip.hidden = false; chip.textContent = ''; chip.classList.toggle('options', options);
+    const s = document.createElement('span'); s.textContent = text; chip.append(s);
+    btns.forEach(([t, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.setAttribute('aria-label', t); b.onclick = (e) => { e.stopPropagation(); f(); }; chip.append(b); });
+    chipExp = ms ? performance.now() + ms : 0; placeChip();
+  };
   const offer = () => {
     if (guideChoice || !chip.hidden) return;
     setChip('new here? want a quick tour?', [
@@ -249,9 +287,10 @@ export function initMascot(S, audio, api) {
   };
   let raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
   const ease = (p) => p * p * (3 - 2 * p), lerp = (a, b, p) => a + (b - a) * p;
-  function hands2(a, b) {                       // both hands onto two screen points (stretchy cartoon arms)
-    const u = size / 140, hs = [a, b].map((p) => [50 + ((p.x - M.x) / u) * M.face, 118 + (p.y - M.y) / u]).sort((p, q) => p[0] - q[0]), A2 = ([sx, sy], px) => [(Math.atan2(sy - 68, sx - px) * 180) / Math.PI, Math.hypot(sx - px, sy - 68)];
-    arms(A2(hs[0], 12), A2(hs[1], 88));
+  function hands2(a, b) {                       // place both hands in the body's actual transformed coordinate space
+    const hs = [screenToBody(a.x, a.y), screenToBody(b.x, b.y)].sort((p, q) => p.x - q.x);
+    const pose = (p, px) => [Math.atan2(p.y - 68, p.x - px) * 180 / Math.PI, Math.hypot(p.x - px, p.y - 68)];
+    arms(pose(hs[0], 12), pose(hs[1], 88));
   }
   /* walk up to a real control, take hold with both hands, strain for a random time (sometimes it slips and retries),
      and let the real control move while the hands move with it. The body stands NEXT to the control, never on it. */
@@ -279,6 +318,7 @@ export function initMascot(S, audio, api) {
     ['#power', 'this is the power switch. watch me flip it!', () => ({ done: () => api.setMotor(true) })],
     ['#lever', 'now the needle. i’ll pull this lever to drop it.', () => ({ done: () => api.autoCue() })],
     ['#volume', 'turn this knob for volume. like so…', () => { const v0 = S.volume; return { spin: 2.4, progress: (p) => api.setVolume(p < .5 ? lerp(v0, .2, ease(p * 2)) : lerp(.2, v0, ease(p * 2 - 1))) }; }],
+    ['#trim', 'this little dial fine-tunes the record speed.', () => { const v0 = S.trim; return { spin: 1.7, progress: (p) => api.setTrim(p < .5 ? lerp(v0, 1.2, ease(p * 2)) : lerp(1.2, v0, ease(p * 2 - 1))) }; }],
     ['.seek__knob', 'drag this knob to jump around the song.', () => ({ done: () => api.cueTo(S.rec.index, (S.span[S.rec.index] || 60) * .55) })],
     ['.dot:nth-child(2)', 'and tap a dot to pick another song.', () => ({ quick: true, done: () => api.skipTo((S.rec.index + 1) % S.tracks.length) })],
   ];
@@ -378,11 +418,54 @@ export function initMascot(S, audio, api) {
   } catch { /* storage unavailable: this visit still remembers the choice in memory */ }
   function saveGuideChoice(choice) {
     guideChoice = choice;
-    try {
-      localStorage.setItem('static.guide.choice.v1', choice);
-      if (choice === 'accepted') localStorage.setItem('static.guide', '1');
-    } catch { /* storage unavailable on this device/browser */ }
+    writePref('static.guide.choice.v1', choice);
+    if (choice === 'accepted') writePref('static.guide', '1');
   }
+  function setMascotHidden(hidden) {
+    hiddenByUser = !!hidden; writePref('thinking.hidden', hiddenByUser ? '1' : '0');
+    btn.classList.toggle('user-hidden', hiddenByUser);
+    btn.setAttribute('aria-hidden', hiddenByUser ? 'true' : 'false');
+    btn.tabIndex = hiddenByUser ? -1 : 0;
+    launcher.hidden = !hiddenByUser;
+    hideChip(); hide();
+    if (!hiddenByUser) {
+      measure(); const spotsNow = spots(rects());
+      if (!inV(M.x, M.y) || hit(M.x, M.y, rects())) { const safe = pick(spotsNow); if (safe) { M.x = safe.x; M.y = safe.y; M.sit = safe.kind === 'edge' ? 1 : 0; } }
+      btn.classList.add('on'); idleAt = performance.now();
+    }
+    interrupt();
+  }
+  function setQuietMode(onOff) {
+    quietMode = !!onOff; writePref('thinking.quiet', quietMode ? '1' : '0');
+    if (quietMode) { queue = []; hide(); } else idleAt = performance.now();
+    interrupt();
+  }
+  function setReducedMotion(onOff) {
+    if (motionQuery.matches) { reduce = true; btn.classList.add('motion-reduced'); return; }
+    writePref('thinking.reduceMotion', onOff ? '1' : '0'); reduce = !!onOff;
+    btn.classList.toggle('motion-reduced', reduce);
+    document.documentElement.classList.toggle('thinking-reduced-motion', reduce);
+    if (reduce) { M.sp = 0; M.dance = 0; M.sway = 0; M.run = 0; M.vr = 0; M.rot = 0; }
+    interrupt();
+  }
+  function showOptions() {
+    // Opening settings takes priority over any idle animation or unfinished speech.
+    queue = queue.filter((a) => a.k === 'land');
+    hide(); interrupt(); recoverInterruptedAction();
+    setChip('@Thinking · settings', [
+      ['guide again', () => { saveGuideChoice('accepted'); hideChip(); queue.push({ k: 'tour' }); interrupt(); }],
+      [quietMode ? 'unquiet' : 'quiet mode', () => { setQuietMode(!quietMode); showOptions(); }],
+      [hiddenByUser ? 'show mascot' : 'hide mascot', () => { setMascotHidden(!hiddenByUser); }],
+      [motionQuery.matches ? 'system reduced motion' : (reduce ? 'reduced motion: on' : 'reduce motion'), () => { if (motionQuery.matches) setChip('motion is limited by your device preference', [['close', () => hideChip()]], 2600, true); else { setReducedMotion(!reduce); showOptions(); } }],
+      ['close', () => hideChip()]
+    ], 0, true);
+    setTimeout(() => chip.querySelector('button')?.focus(), 0);
+  }
+  on(launcher, 'click', () => setMascotHidden(false));
+  on(launcher, 'keydown', (e) => { if (e.key === 'Escape') launcher.blur(); });
+  on(btn, 'keydown', (e) => { if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') { e.preventDefault(); if (!tourOn) showOptions(); } });
+  on(chip, 'keydown', (e) => { if (e.key === 'Escape') { hideChip(); btn.focus(); } });
+  on(motionQuery, 'change', () => { reduce = motionQuery.matches || readPref('thinking.reduceMotion') === '1'; btn.classList.toggle('motion-reduced', reduce); document.documentElement.classList.toggle('thinking-reduced-motion', reduce); if (reduce) { M.dance = 0; M.sp = 0; M.sway = 0; M.vr = 0; } interrupt(); });
   const D = { el: null, W: 1, x: 0, y: 0, s: 1, a: 0, spin: 0, lift: 0, p: 1, ms: 1, from: { x: 0, y: 0, s: 1 }, to: () => ({ x: 0, y: 0, s: 1 }), hold: false };
   function discFrame(dt) {
     if (!D.el) return; D.a += D.spin * dt; if (D.p < 1) D.p = Math.min(1, D.p + (dt * 1000) / D.ms);
@@ -412,13 +495,13 @@ export function initMascot(S, audio, api) {
   async function prod(g) {
     const el = $(pick(['.tagline', '#title', '#artist'])); if (!el || !el.offsetWidth) return;
     const n = nearSpot(el); if (!n.s) return; await goTo(n.s, g, true); M.face = n.tx >= M.x ? 1 : -1; reach(n.tx, n.ty, 52); M.tgt = { x: n.tx, y: n.ty }; await wait(620, g);
-    const h = handPoint(), r = n.r, touching = h.x >= r.left - 11 && h.x <= r.right + 11 && h.y >= r.top - 11 && h.y <= r.bottom + 11;
+    const r = n.r, touching = handTouches(r, 8);
     if (touching) { el.classList.add('m-wob'); setTimeout(() => el.classList.remove('m-wob'), 900); await say(L('prod'), 'sly', g, 1100); }
     else { M.tgt = null; arms(...REST); await wait(250, g); }
   }
   on(bub.querySelector('.mtx'), 'click', () => { if (!tourOn && !curious) interrupt(); });   // tap a bubble to dismiss it
   async function antic(g) {
-    const k = pick(reduce ? ['look', 'chat', 'yawn', 'stretch', 'hum'] : ['look', 'chat', 'chat', 'yawn', 'stretch', 'hum', 'spin', 'dance', 'dance', 'surprise']);
+    const k = pick(reduce ? ['look', 'chat', 'yawn', 'stretch', 'hum'] : ['look', 'chat', 'chat', 'yawn', 'stretch', 'hum', 'spin', 'dance', 'dance', 'surprise', 'wave', 'shrug', 'tilt']);
     if (k === 'look') { M.tgt = { x: R(0, innerWidth), y: R(0, innerHeight) }; await wait(R(1200, 2400), g); M.tgt = null; }
     else if (k === 'stretch') { arms([-70, 30], [-110, 30]); await wait(1100, g); arms(...REST); }
     else if (k === 'yawn') { M.ot = 1; M.wt = .3; await wait(1300, g); M.ot = 0; }
@@ -426,6 +509,9 @@ export function initMascot(S, audio, api) {
     else if (k === 'chat') await say(L('chat'), 'say', g);
     else if (k === 'dance') { M.dance = 1; await wait(3200, g); M.dance = 0; }
     else if (k === 'surprise') { M.wide = 1; M.glad = 1; arms([-125, 30], [-55, 30]); await wait(480, g); M.wide = 0; arms(...REST); await wait(220, g); }
+    else if (k === 'wave') { await say(pick(['oh, hey.', 'you still here? nice.', 'hi again.']), 'say', g, 350); for (let i = 0; i < 3; i++) { arms(null, [-122 + (i % 2 ? 22 : -8), 26]); await wait(240, g); } arms(...REST); }
+    else if (k === 'shrug') { M.wide = .25; arms([-58, 25], [-124, 25]); await wait(850, g); arms(...REST); M.wide = 0; }
+    else if (k === 'tilt') { M.rot = M.face * 10; M.tgt = mx >= 0 ? { x: mx, y: my } : { x: M.x + 80 * M.face, y: M.y - 60 }; await wait(650, g); M.rot = 0; M.tgt = null; await wait(180, g); }
     else if (k === 'rage') { btn.classList.add('mad'); await say(L('angry'), 'angry', g, 900); btn.classList.remove('mad'); }
     else await say(L('sing'), 'think', g, 900);
     await wait(R(900, 2200), g);
@@ -460,8 +546,14 @@ export function initMascot(S, audio, api) {
   async function decide(g) {
     while (M.mode !== 'walk') await wait(140, g);
     const now = performance.now(); if (!playing && !M.hold) M.micT = 0; arms(...REST); M.tgt = null; M.dance = 0; M.sway = 0; M.fing = 0;
+    if (hiddenByUser) { await wait(1100, g); return; }
     if (queue.length) return run(queue.shift(), g);
-    if (!welcomed) { welcomed = true; arms(null, [-62, 30]); await say(L('hi'), 'say', g, 1800); if (!guideChoice) offer(); return; }
+    if (!welcomed) {
+      welcomed = true;
+      if (quietMode) return;
+      arms(null, [-62, 30]); await say(L('hi'), 'say', g, 1800); if (!guideChoice) offer(); return;
+    }
+    if (quietMode) { await wait(1000, g); return; }
     if (!chip.hidden) { await wait(500, g); return; }
     if (!reduce && now > nextIdleAnticAt && now - idleAt > 10000 && now - born > 18000 && !M.petting) {
       // Idle antics may inspect the record, but must never change the user's switches, volume or speed.
@@ -472,6 +564,15 @@ export function initMascot(S, audio, api) {
     if (now - idleAt > 40000) { await say('…', 'think', g, 700); M.sleep = 1; show('zZz…', 'sleepy'); return wait(6e5, g); }
     return wander(g);
   }
+  function recoverInterruptedAction() {
+    // A cancelled interaction must never leave a stale reach, pose or movement promise behind.
+    M.go = null; M.jp = null; M.grip = null; M.eff = 0; M.fing = 0; M.micT = 0; M.hold = 0;
+    M.dance = 0; M.sway = 0; M.struggle = 0; M.wide = 0; M.glad = 0; M.tgt = null; M.ot = 0; M.wt = .5;
+    if (M.mode === 'jump') { M.mode = 'walk'; M.vx = M.vy = M.vr = 0; M.rot = 0; }
+    if (M.mode === 'walk') { M.rot = 0; M.sq = 0; M.sit = 0; }
+    // Preserve user-driven physics and dragging: only reset the pose, never steal a held/falling mascot.
+    arms(...REST); ring.hidden = true;
+  }
   async function loop() {
     while (alive) {
       const g = ++gen;
@@ -479,9 +580,7 @@ export function initMascot(S, audio, api) {
       catch (e) {
         if (e !== 'x') console.warn(e);
         hide(); btn.classList.remove('mad');
-        M.dance = 0; M.sway = 0; M.fing = 0; M.grip = null; M.eff = 0; M.micT = 0;
-        M.hold = 0; M.ot = 0; M.wt = .5; M.wide = 0; M.tgt = null;
-        arms(...REST);
+        recoverInterruptedAction();
         await new Promise((r) => setTimeout(r, 80));
       }
     }
@@ -491,35 +590,55 @@ export function initMascot(S, audio, api) {
   function frame(now) {
     if (!alive) return; requestAnimationFrame(frame);
     const dt = Math.min(.05, (now - T0) / 1000 || .016), t = now / 1000, k = 1 - Math.pow(.001, dt); T0 = now;
-    const pl = !!(S.motor && S.arm.mode === 'down'); if (pl !== playing) { playing = pl; if (pl) singSince = performance.now(); if (!tourOn && !pr && !raging && M.mode === 'walk') { if (!pl) queue.push(singSince && performance.now() - singSince > 4000 && S.rec.pos > .6 ? { k: 'annoyed' } : { k: 'end' }); interrupt(); } }
-    if (S.rec.index !== lastIdx) { lastIdx = S.rec.index; if (S.motor && welcomed && !tourOn && !pr) { queue.push({ k: 'track', title: S.tracks[lastIdx]?.title || 'this one' }); interrupt(); } }
+    const pl = !!(S.motor && S.arm.mode === 'down'); if (pl !== playing) { playing = pl; if (pl) singSince = performance.now(); if (!quietMode && !tourOn && !pr && !raging && M.mode === 'walk') { if (!pl) queue.push(singSince && performance.now() - singSince > 4000 && S.rec.pos > .6 ? { k: 'annoyed' } : { k: 'end' }); interrupt(); } }
+    if (S.rec.index !== lastIdx) { lastIdx = S.rec.index; if (!quietMode && S.motor && welcomed && !tourOn && !pr) { queue.push({ k: 'track', title: S.tracks[lastIdx]?.title || 'this one' }); interrupt(); } }
     modeStep(dt, t, k);
     if (M.go) { const go = M.go; if (go.g !== gen) { M.go = null; go.rej('x'); } else { const p = go.path[go.i], dx = p.x - M.x, dy = p.y - M.y, d = Math.hypot(dx, dy), v = (reduce ? 400 : 210) * dt;
       if (d <= Math.max(2, v)) { M.x = p.x; M.y = p.y; if (++go.i >= go.path.length) { M.go = null; go.res(); } } else { M.x += (dx / d) * v; M.y += (dy / d) * v; if (Math.abs(dx) > 1) M.face = dx > 0 ? 1 : -1; M.ph += dt * 13; M.sit = 0; } } }
     M.pop = Math.min(1, M.pop + dt * (reduce ? 20 : 2.6)); const pop = 1 + Math.sin(M.pop * Math.PI) * .12 * (M.pop < 1), sc = M.pop < 1 ? Math.min(1, M.pop * 1.6) : 1;
-    let lv = 0; if (playing) { lv = audio.level ? audio.level() : 0; if (lv < .02) lv = .22 + .2 * Math.abs(Math.sin(t * 7)); M.ot = cl(lv * 1.7, .05, 1); M.wt = .45 + Math.sin(t * 9) * .3; }
+    let lv = 0;
+    if (playing) {
+      lv = audio.level ? cl(audio.level(), 0, 1) : 0;
+      // Speech owns the mouth while a bubble is being read; music only lip-syncs when there is real signal.
+      if (!speechBusy) { M.ot = cl((lv - .025) * 2.15, 0, .88); M.wt = .45 + lv * .22; }
+    }
     M.o += (M.ot - M.o) * (1 - Math.pow(1e-4, dt)); M.w += (M.wt - M.w) * k; M.glad = Math.max(0, M.glad - dt * .8); M.sp = Math.max(0, M.sp - dt * 1.3);
-    if (!playing && !B && !M.hold && !M.go) { M.ot = Math.max(0, M.ot - dt); } M.mic += (M.micT - M.mic) * k;
+    if ((!playing || speechBusy) && !B && !M.hold && !M.go) { M.ot = Math.max(0, M.ot - dt * 1.4); } M.mic += (M.micT - M.mic) * k;
     // eyes
     M.nb -= dt; if (M.nb < 0) { M.bl = 1; M.nb = R(2, 5); } M.bl = Math.max(0, M.bl - dt * 7);
-    const hx = M.x, hy = M.y - BH * .55, tg = M.tgt || (mx >= 0 ? { x: mx, y: my } : null); const lx = tg ? cl((tg.x - hx) / 180, -1, 1) * M.face : 0, ly = tg ? cl((tg.y - hy) / 180, -1, 1) : 0; M.lx += (lx - M.lx) * k; M.ly += (ly - M.ly) * k;
+    const hx = M.x, hy = M.y - BH * .55, activePointer = mx >= 0 && performance.now() - idleAt < 4200, tg = M.tgt || (activePointer ? { x: mx, y: my } : null);
+    const lx = tg ? cl((tg.x - hx) / 180, -1, 1) * M.face : Math.sin(t * .7) * .12, ly = tg ? cl((tg.y - hy) / 180, -1, 1) : Math.sin(t * .53) * .08; M.lx += (lx - M.lx) * k; M.ly += (ly - M.ly) * k;
     const es = M.sleep ? .08 : Math.max(.08, 1 - Math.sin(M.bl * Math.PI)) * (1 - M.glad * .35);
     const ew = 1 + M.wide * .25, an = 14 * Math.min(1, M.mad) + (M.mon > .5 ? 10 : 0); E.el.setAttribute('transform', `translate(34 46)rotate(${an})scale(${ew} ${es * ew})`); E.er.setAttribute('transform', `translate(66 46)rotate(${-an})scale(${ew} ${es * ew})`);
+    const brow = M.sleep ? 3 : M.mad > .45 ? -8 - M.mad * 4 : M.wide > .45 ? 5 : M.glad > .6 ? -3 : Math.sin(t * .55) * .8;
+    E.ebl.setAttribute('transform', `rotate(${brow} 34 29)`); E.ebr.setAttribute('transform', `rotate(${-brow} 66 29)`);
     pps.forEach((p) => { p.setAttribute('cx', M.lx * 3.6); p.setAttribute('cy', M.ly * 4); });
     E.mo.setAttribute('d', mouthD(M.sleep ? .1 : M.o, M.w));
     // arms + mic
-    const sw = Math.sin(t * 1.7) * 2.5, A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
+    const sw = (M.tgt || M.grip || tourOn) ? 0 : Math.sin(t * 1.7) * 2.5, A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
     A(M.L, E.al, E.hl, 12, 1, E.al2); const [hxr, hyr] = A(M.Rm, E.ar, E.hr, 88, -1, E.ar2);
     E.mc.setAttribute('transform', `translate(${hxr} ${hyr})rotate(-36)scale(${M.mic})`); E.mc.style.display = M.mic > .03 ? '' : 'none'; E.fg.style.display = M.fing ? '' : 'none'; if (M.fing) E.fg.setAttribute('transform', `translate(${hxr} ${hyr})`);
-    E.an.setAttribute('transform', `rotate(${Math.sin(t * 3) * 5 + lv * 14} 34 12)`); E.bu.setAttribute('opacity', playing ? .35 + lv : .55 + Math.sin(t * 2) * .35);
-    // body
-    const walk = !!M.go, hop = walk ? Math.abs(Math.sin(M.ph)) * 5 : M.dance || M.run ? Math.abs(Math.sin(t * 9)) * (4 + 10 * (playing ? Math.max(.3, lv) : .7)) : 0, bob = hop + (playing ? lv * 3 : Math.sin(t * 2) * .8) + (M.sit && !walk ? 4 : 0), fx = Math.cos((1 - M.sp) * TAU);
-    E.bd.setAttribute('transform', `rotate(${M.rot} 50 84)translate(50 118)scale(${M.face * (M.sp ? fx : 1) * sc * pop} ${sc * pop * (1 + (walk ? Math.sin(M.ph * 2) * .03 : Math.sin(t * 2) * .012))})translate(-50 -118)translate(0 ${-bob})`);
-    const sw2 = walk ? Math.sin(M.ph) * 4 : M.mode === 'held' || M.struggle || M.run ? Math.sin(t * 24) * 7 : M.sit ? Math.sin(t * 3) * 2 : 0; E.fl.setAttribute('cy', 113 + sw2 - (M.sit ? 0 : 0)); E.fr.setAttribute('cy', 113 - sw2); E.sh.setAttribute('opacity', .5 * sc);
+    E.an.setAttribute('transform', `rotate(${Math.sin(t * (M.sleep ? .7 : 3)) * (M.sleep ? 1.4 : 5) + lv * 14} 34 12)`); E.bu.setAttribute('opacity', playing ? .35 + lv * .35 : .48 + Math.sin(t * 1.4) * .2);
+    // A small alternating gait and softer breathing keep movement from looking like a sliding sticker.
+    const walk = !!M.go, gait = walk ? Math.sin(M.ph) : 0;
+    const hop = reduce ? 0 : walk ? Math.abs(gait) * 4.6 : M.dance || M.run ? Math.abs(Math.sin(t * 9)) * (4 + 10 * (playing ? Math.max(.3, lv) : .7)) : 0;
+    const breath = M.sleep ? Math.sin(t * .65) * 1.1 : Math.sin(t * 2) * .8;
+    const bob = hop + (playing ? lv * 3 : breath) + (M.sit && !walk ? 4 : 0), fx = Math.cos((1 - M.sp) * TAU);
+    E.bd.setAttribute('transform', `rotate(${M.rot + (walk ? gait * 3.2 : 0)} 50 84)translate(50 118)scale(${M.face * (M.sp ? fx : 1) * sc * pop} ${sc * pop * (1 + (walk ? Math.sin(M.ph * 2) * .03 : Math.sin(t * (M.sleep ? .65 : 2)) * .012))})translate(-50 -118)translate(0 ${-bob})`);
+    const sw2 = walk ? gait * 4.5 : M.mode === 'held' || M.struggle || M.run ? Math.sin(t * 24) * 7 : M.sit ? Math.sin(t * 3) * 2 : 0;
+    E.fl.setAttribute('cx', 35 + (walk ? gait * 1.4 : 0)); E.fr.setAttribute('cx', 65 - (walk ? gait * 1.4 : 0));
+    E.fl.setAttribute('cy', 113 + sw2); E.fr.setAttribute('cy', 113 - sw2); E.sh.setAttribute('opacity', .5 * sc);
     const jx = M.eff ? Math.sin(t * 55) * 1.4 * M.eff : raging ? Math.sin(t * 40) * 2 : 0, mk = Math.round(Math.min(1.5, M.mad) * 20), key = mk * 100 + Math.round(M.mon * 10) * 10 + Math.round(M.pet * 5);
     if (key !== lastF) { lastF = key; const v = mk / 20; btn.style.filter = v > .02 || M.mon > .3 ? `hue-rotate(${-24 * v}deg) saturate(${1 + 1.5 * v}) brightness(${1 + .1 * v})${M.mon > .3 ? ' drop-shadow(0 0 12px rgba(255,70,40,.85))' : ''}` : ''; btn.style.setProperty('--bl', (.35 + .5 * M.pet + .25 * Math.min(1, M.mad)).toFixed(2)); E.mn.setAttribute('opacity', M.mon.toFixed(2)); }
     const big = 1 + .28 * M.mon; btn.style.transform = `translate3d(${M.x - size / 2 + jx}px,${M.y - 0.943 * size}px,0)scale(${(1 + M.sq * .18) * big},${(1 - M.sq * .28) * big})`;
+    syncActionState();
     if (B && Math.hypot(B.px - M.x, B.py - M.y) > 8) place();
+  }
+
+  /* ── one authoritative interaction state for diagnostics and styling ── */
+  function syncActionState() {
+    const next = hiddenByUser ? 'hidden' : M.mode === 'held' ? 'held' : (M.mode === 'fall' || M.mode === 'disc') ? 'tumbling' : M.sleep ? 'sleeping' : tourOn ? 'guiding' : curious ? 'curious' : (op || M.grip) ? 'reaching' : (M.go || M.jp) ? 'moving' : M.dance ? 'dancing' : speechBusy ? 'speaking' : quietMode ? 'quiet' : 'idle';
+    if (next !== actionState) { actionState = next; btn.dataset.state = next; }
   }
 
   /* ── wiring ── */
@@ -532,8 +651,8 @@ export function initMascot(S, audio, api) {
     }
   };
   const grab = () => { interrupt(); M.go = null; M.jp = null; M.dc = null; M.grip = null; M.mode = 'held'; M.micT = 0; M.peak = 0; M.petting = 0; btn.classList.add('held'); setTimeout(() => { if (M.mode === 'held') { show(L('scared'), 'shout'); tt.textContent = B.text; gg.textContent = ''; } }, 90); };
-  let pt = 0;
-  on(btn, 'pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); drag = { id: e.pointerId, x: e.clientX, y: e.clientY, px: e.clientX, py: e.clientY, t0: performance.now(), moved: false, pet: false, hist: [] }; activity(); clearTimeout(pt); pt = setTimeout(() => { if (drag && !drag.moved && !tourOn) { drag.pet = true; M.petting = 1; } }, 520); });   // hold still = gentle petting
+  let pt = 0, menuPt = 0;
+  on(btn, 'pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); drag = { id: e.pointerId, x: e.clientX, y: e.clientY, px: e.clientX, py: e.clientY, t0: performance.now(), moved: false, pet: false, options: false, hist: [] }; activity(); clearTimeout(pt); clearTimeout(menuPt); pt = setTimeout(() => { if (drag && !drag.moved && !tourOn) { drag.pet = true; M.petting = 1; } }, 520); menuPt = setTimeout(() => { if (drag && !drag.moved && !tourOn) { drag.options = true; M.petting = 0; hide(); showOptions(); } }, 1750); });   // hold still to pet; longer hold opens options
   on(btn, 'pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return; const now = performance.now(), d = Math.hypot(e.clientX - drag.x, e.clientY - drag.y);
     if (!drag.moved) {
@@ -544,9 +663,9 @@ export function initMascot(S, audio, api) {
     if (drag.moved) { drag.hist.push([now, e.clientX, e.clientY]); drag.hist = drag.hist.filter((h) => now - h[0] < 90); M.hx = e.clientX; M.hy = e.clientY; }
   });
   const drop = (e, cancel) => {
-    if (!drag || e.pointerId !== drag.id) return; const d = drag; drag = null; clearTimeout(pt); M.petting = 0; btn.classList.remove('held');
+    if (!drag || e.pointerId !== drag.id) return; const d = drag; drag = null; clearTimeout(pt); clearTimeout(menuPt); M.petting = 0; btn.classList.remove('held');
     if (!d.moved) {
-      if (!cancel && !d.pet && !tourOn && !raging) { const now = performance.now(), gap = now - lastTapAt, hard = gap < 750; lastTapAt = now; M.mad = Math.min(1.7, M.mad + (hard ? .3 : gap < 1800 ? .14 : .05)); queue.push(M.mad >= 1 ? { k: 'tantrum' } : { k: 'tap', hard }); interrupt(); }   // rapid taps hurt; too many and it snaps
+      if (!d.options && !cancel && !d.pet && !tourOn && !raging) { const now = performance.now(), gap = now - lastTapAt, hard = gap < 750; lastTapAt = now; M.mad = Math.min(1.7, M.mad + (hard ? .3 : gap < 1800 ? .14 : .05)); queue.push(M.mad >= 1 ? { k: 'tantrum' } : { k: 'tap', hard }); interrupt(); }   // rapid taps hurt; too many and it snaps
       return;
     }
     const h = d.hist; let vx = 0, vy = 0; if (h.length > 1) { const a = h[0], b = h[h.length - 1], dt = (b[0] - a[0]) / 1000 || 1; vx = (b[1] - a[1]) / dt; vy = (b[2] - a[2]) / dt; }
@@ -555,15 +674,18 @@ export function initMascot(S, audio, api) {
     else { M.vx = cl(vx, -1600, 1600); M.vy = cl(vy, -1600, 1600); M.vr = M.vx * .3; M.peak = 0; M.mode = 'fall'; }
   };
   on(btn, 'pointerup', (e) => drop(e, false)); on(btn, 'pointercancel', (e) => drop(e, true));
+  on(btn, 'contextmenu', (e) => { e.preventDefault(); if (!tourOn) { hide(); showOptions(); } });
   on(btn, 'click', (e) => { if (e.detail === 0 && !tourOn) { queue.push({ k: 'tap' }); interrupt(); } });
-  on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,button,[role],a,#deckFit') || tourOn || reduce || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
+  on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,.mrestore,button,[role],a,#deckFit') || tourOn || reduce || quietMode || hiddenByUser || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
   on(window, 'pointermove', (e) => { if (e.pointerType === 'mouse') { mx = e.clientX; my = e.clientY; } idleAt = performance.now(); if (M.sleep) activity(); });
   on(window, 'keydown', () => { activity(); if (curious) interrupt(); }); on(window, 'scroll', activity, { passive: true });
-  let rt = 0; on(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { measure(); if (M.mode === 'walk' && !op && !raging && !curious && (hit(M.x, M.y, rects()) || !inV(M.x, M.y))) { const s = spots(rects()); if (s.length) { const p = pick(s); M.x = p.x; M.y = p.y; interrupt(); } } }, 160); });
+  let rt = 0; on(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { measure(); if (M.mode === 'walk' && !op && !raging && !curious && (hit(M.x, M.y, rects()) || !inV(M.x, M.y))) { const s = spots(rects()); if (s.length) { const p = pick(s); M.x = p.x; M.y = p.y; interrupt(); } } if (B) place(); if (!chip.hidden) placeChip(); }, 160); });
   const settle = setInterval(() => { if (!M.go && !M.sleep && M.mode === 'walk' && !tourOn && !curious && !op && !raging && !M.grip && hit(M.x, M.y, rects())) { const s = spots(rects()); if (s.length) { queue.unshift({ k: 'move', ...pick(s) }); interrupt(); } } }, 800);
 
   measure(); const sp = spots(rects()), home = sp.find((s) => s.kind === 'home'), s0 = (home && Math.random() < .5 ? home : pick(sp.filter((s) => s.kind !== 'home')) || home) || { x: innerWidth / 2, y: innerHeight - 12 };
-  M.x = s0.x; M.y = s0.y; M.sit = s0.kind === 'edge' ? 1 : 0; btn.classList.add('on'); requestAnimationFrame(frame); setTimeout(loop, reduce ? 300 : 1100);
-  if (location.search.includes('debug')) window.__static = { M, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, queue, interrupt, chip, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, hit, BW: () => BW, BH: () => BH };
-  return () => { chip.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearTimeout(ht); btn.remove(); bub.remove(); ring.remove(); };
+  M.x = s0.x; M.y = s0.y; M.sit = s0.kind === 'edge' ? 1 : 0; btn.classList.add('on');
+  if (hiddenByUser) { launcher.hidden = false; }
+  requestAnimationFrame(frame); setTimeout(loop, reduce ? 300 : 1100);
+  if (location.search.includes('debug')) window.__static = { M, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, get hidden() { return hiddenByUser; }, get quiet() { return quietMode; }, get actionState() { return actionState; }, queue, interrupt, chip, showOptions, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, hit, BW: () => BW, BH: () => BH };
+  return () => { chip.remove(); launcher.remove(); document.documentElement.classList.remove('thinking-reduced-motion'); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearTimeout(ht); clearTimeout(pt); clearTimeout(menuPt); btn.remove(); bub.remove(); ring.remove(); };
 }

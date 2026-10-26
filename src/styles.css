@@ -346,51 +346,72 @@ a{color:inherit}
   .deck-fit{transform:none}
 }
 
-/* ───────── Static, the after-hours mascot (src/mascot.js) ───────── */
-.stm{--ms:clamp(58px,15vmin,96px);position:fixed;left:0;top:0;z-index:40;width:var(--ms);height:var(--ms);padding:0;border:0;background:none;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;will-change:transform;opacity:0;transition:opacity .5s}
+/* ───────── @Thinking mascot: consolidated styles ───────── */
+.stm{
+  --ms:clamp(56px,12vmin,94px);position:fixed;left:0;top:0;z-index:40;width:var(--ms);height:var(--ms);
+  padding:0;border:0;background:none;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;
+  will-change:transform;transform-origin:50% 94%;opacity:0;transition:opacity .45s ease,filter .25s ease;
+}
 .stm.on{opacity:1}
+.stm.user-hidden,.stm.user-hidden.on{opacity:0!important;pointer-events:none!important}
+.stm.held{cursor:grabbing}
+.stm.mad{filter:hue-rotate(-18deg) saturate(1.35)}
 .stm svg{display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
 .stm:focus-visible{outline:2px dashed #d9b47a;outline-offset:4px;border-radius:14px}
-.mbub{position:fixed;left:0;top:0;z-index:41;pointer-events:none;will-change:transform;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35));animation:mpop .22s cubic-bezier(.3,1.6,.5,1)}
-.mbub[hidden],.mring[hidden]{display:none}
-.mbub svg{position:absolute;left:0;top:0;overflow:visible}
-.mtx{position:absolute;left:26px;top:26px;box-sizing:border-box;width:max-content;max-width:min(205px,58vw);padding:7px 11px;text-align:center;font:700 12.5px/1.28 ui-rounded,"Arial Rounded MT Bold","Trebuchet MS",system-ui,sans-serif;color:#1d140e;overflow-wrap:anywhere}
-.mtx i{opacity:0;font-style:normal}.mtx b{font-weight:700}
-.mbub.shout .mtx{font-size:13.5px;text-transform:uppercase;letter-spacing:.02em}
-.mring{position:fixed;z-index:39;pointer-events:none;border:2px solid #d9b47a;border-radius:14px;box-shadow:0 0 14px rgba(217,180,122,.5);animation:mping 1.1s ease-in-out infinite}
+.stm.motion-reduced{transition:none!important}
+.stm[data-state="sleeping"]{filter:saturate(.78) brightness(.94)}
+.mbub{position:fixed;left:0;top:0;z-index:41;pointer-events:none;will-change:transform;filter:drop-shadow(0 5px 9px rgba(0,0,0,.35));animation:mpop .24s cubic-bezier(.3,1.45,.5,1)}
+.mbub[hidden],.mring[hidden],.mchip[hidden],.mrestore[hidden]{display:none!important}
+.mbub svg{position:absolute;left:0;top:0;overflow:visible;filter:drop-shadow(0 7px 10px rgba(0,0,0,.36)) drop-shadow(0 0 10px rgba(255,236,190,.13));animation:mfloat 3.2s ease-in-out infinite}
+.mtx{position:absolute;left:26px;top:26px;box-sizing:border-box;width:max-content;max-width:min(232px,calc(100vw - 64px));padding:9px 14px;text-align:center;overflow-wrap:anywhere;hyphens:auto;
+  font:600 13.5px/1.36 "Space Grotesk",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:0;color:#2b2016}
+.mtx i{opacity:0;font-style:normal}.mtx b{font-weight:650}
+.mbub.shout .mtx{font-weight:750;color:#8a1530;letter-spacing:.015em}
+.mbub.angry .mtx{font-weight:700;color:#8a1a10}
+.mbub.think .mtx,.mbub.sleepy .mtx{color:#2a3a52}
+.mbub.sly .mtx{color:#3a4a0e}
+.mbub.angry .mtx,.mbub.shout .mtx{animation:mshake .16s ease-in-out 3}
+.mbub .mtx{pointer-events:auto;cursor:pointer;user-select:none}
+.mring{position:fixed;z-index:39;pointer-events:none;border:2px solid #d9b47a;border-radius:12px;box-shadow:0 0 14px rgba(217,180,122,.42);animation:mping 1.2s ease-in-out infinite}
 .mn{position:fixed;z-index:40;pointer-events:none;color:#d9b47a;font:700 18px/1 system-ui,sans-serif;text-shadow:0 1px 6px rgba(0,0,0,.6);animation:mnote 2.2s ease-out forwards}
-@keyframes mpop{from{opacity:0;scale:.6}}
-@keyframes mping{50%{transform:scale(1.05);opacity:.55}}
-@keyframes mnote{from{opacity:0;transform:scale(.6)}15%{opacity:1}to{opacity:0;transform:translate(var(--dx),-54px) rotate(var(--r))}}
-@media (prefers-reduced-motion:reduce){.mring,.mbub{animation:none}.mn{display:none}}
-
-/* Static v2: carry-able, 3D-ish, with a clearer bubble and the tour offer */
-.stm{touch-action:none;cursor:grab;transform-origin:50% 94%}
-.stm.held{cursor:grabbing}.stm.mad{filter:hue-rotate(-22deg) saturate(2) brightness(1.08)}
-.mtx{font:italic 600 13.5px/1.32 Lora,Georgia,serif;letter-spacing:.01em;padding:8px 13px;color:#2a1b12}
-.mbub.shout .mtx{font:800 13px/1.2 ui-rounded,"Trebuchet MS",system-ui,sans-serif;font-style:normal;color:#7a1810;animation:mshake .13s infinite}
-.mchip{position:fixed;left:0;top:0;z-index:42;display:flex;align-items:center;gap:6px;padding:5px 6px 5px 12px;border-radius:999px;background:#f4ecd9;border:2px solid #1d140e;box-shadow:0 3px 0 rgba(0,0,0,.35);font:italic 600 12.5px Lora,Georgia,serif;color:#2a1b12;animation:mpop .22s cubic-bezier(.3,1.6,.5,1)}
-.mchip[hidden]{display:none}
-.mchip button{font:700 12px system-ui,sans-serif;border:0;border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer;background:#d9b47a;color:#1d140e}.mchip button+button{background:transparent;color:#6b5a48}
-@keyframes mshake{50%{transform:translate(1px,-1px) rotate(.6deg)}}
-
-/* Static v3: lifted record, mood bubbles, tap-to-dismiss */
-.mdisc{position:fixed;left:0;top:0;z-index:39;pointer-events:none;border-radius:50%;will-change:transform;filter:drop-shadow(0 8px 10px rgba(0,0,0,.55))}
-.mdisc .record{position:absolute}
-.mbub .mtx{pointer-events:auto;cursor:pointer}
-.mbub.angry .mtx{font:700 14px/1.2 "Segoe Script","Bradley Hand","Snell Roundhand","Comic Sans MS",cursive;font-style:normal;color:#7a1810;animation:mshake .13s infinite}
-.mbub.sly .mtx{color:#3d3208}.mbub.sleepy .mtx{color:#233646;font-weight:500}
+.mn.mh{color:#ff8ca3}
 .m-wob{animation:mwob .8s ease-in-out}
+.mchip{position:fixed;left:0;top:0;z-index:42;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:7px;max-width:min(340px,calc(100vw - 24px));max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);overflow:auto;overscroll-behavior:contain;box-sizing:border-box;padding:8px 9px;border:1px solid rgba(100,73,42,.55);border-radius:18px;
+  background:linear-gradient(155deg,#fffdf6,#f1dfbb);color:#2a1b12;box-shadow:0 8px 22px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.9);
+  font:600 12.5px/1.25 Lora,Georgia,serif;animation:mpop .22s cubic-bezier(.3,1.5,.5,1)}
+.mchip>span{flex:1 0 100%;text-align:center;padding:2px 4px;color:#4a3522}
+.mchip button{min-height:34px;max-width:100%;padding:7px 12px;border:1px solid rgba(91,62,31,.16);border-radius:999px;cursor:pointer;background:#d9b47a;color:#1d140e;
+  font:650 11.5px/1.1 system-ui,-apple-system,"Segoe UI",sans-serif;transition:background .15s ease,transform .15s ease}
+.mchip button:hover{background:#e8c995;transform:translateY(-1px)}
+.mchip button:focus-visible,.mrestore:focus-visible{outline:2px solid #8f632e;outline-offset:3px}
+.mchip button+button{background:rgba(255,255,255,.56);color:#6b5a48}
+.mchip.options{max-width:min(300px,calc(100vw - 20px));border-radius:16px}
+.mchip.options button{flex:1 1 auto}
+.mrestore{position:fixed;right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));z-index:43;min-height:40px;padding:8px 13px;border:1px solid rgba(100,73,42,.55);border-radius:999px;
+  background:linear-gradient(155deg,#fffdf6,#f1dfbb);color:#2a1b12;box-shadow:0 6px 18px rgba(0,0,0,.32);font:650 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer}
+.dd i{display:inline-block;width:7px;height:7px;margin:0 3px;border-radius:50%;background:#6b8a3a;animation:mdot 1.1s ease-in-out infinite}
+.dd i:nth-child(2){animation-delay:.18s}.dd i:nth-child(3){animation-delay:.36s}
+@keyframes mpop{from{opacity:0;scale:.72;translate:0 4px}to{opacity:1;scale:1;translate:0 0}}
+@keyframes mping{50%{transform:scale(1.025);opacity:.5}}
+@keyframes mnote{from{opacity:0;transform:scale(.6)}15%{opacity:1}to{opacity:0;transform:translate(var(--dx),-54px) rotate(var(--r))}}
+@keyframes mshake{25%{transform:translate(1px,-1px) rotate(.4deg)}75%{transform:translate(-1px,1px) rotate(-.4deg)}}
 @keyframes mwob{20%{transform:translateY(-4px) rotate(-1.5deg)}50%{transform:translateY(2px) rotate(1deg)}80%{transform:translateY(-2px) rotate(-.6deg)}}
-
-/* Static v4: soft cloud bubbles (no comic outline) that float with the pet */
-.mbub svg{filter:drop-shadow(0 7px 10px rgba(0,0,0,.38)) drop-shadow(0 0 12px rgba(255,236,190,.16));animation:mfloat 2.8s ease-in-out infinite}
-.mbub .mtx{animation:mfloat 2.8s ease-in-out infinite;font:600 13.5px/1.32 "Space Grotesk",Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-style:normal;letter-spacing:0;color:#2b2016;padding:9px 15px;text-transform:none}
-.mbub.think .mtx,.mbub.sleepy .mtx{color:#2a3a52}.mbub.sly .mtx{color:#3a4a0e}.mbub.shout .mtx{color:#8a1530;font-weight:700;animation:mshake .13s infinite}
-.mbub.angry .mtx{font:700 14.5px/1.2 "Segoe Script","Bradley Hand","Snell Roundhand","Comic Sans MS",cursive;color:#8a1a10;animation:mshake .13s infinite}
-.dd i{display:inline-block;width:7px;height:7px;margin:0 3px;border-radius:50%;background:#6b8a3a;animation:mdot 1.1s ease-in-out infinite}.dd i:nth-child(2){animation-delay:.18s}.dd i:nth-child(3){animation-delay:.36s}
-.mchip{background:linear-gradient(#fffdf6,#f5e6c4);border:0;box-shadow:0 6px 14px rgba(0,0,0,.4)}
-.mn.mh{color:#ff7a95}
-@keyframes mfloat{50%{transform:translateY(-3px)}}
+@keyframes mfloat{50%{transform:translateY(-2px)}}
 @keyframes mdot{0%,80%,100%{transform:scale(.6);opacity:.5}40%{transform:scale(1);opacity:1}}
-@media (prefers-reduced-motion:reduce){.mbub svg,.mbub .mtx{animation:none}}
+@media(max-width:420px){
+  .stm{--ms:clamp(54px,14vmin,76px)}
+  .mtx{max-width:calc(100vw - 64px);padding:8px 11px;font-size:12.5px;line-height:1.38}
+  .mchip{gap:6px;padding:7px;max-width:calc(100vw - 16px)}
+  .mchip button{min-height:36px;padding:7px 10px;font-size:11px}
+}
+@media(max-height:470px) and (orientation:landscape){
+  .stm{--ms:clamp(48px,15vh,68px)}
+  .mtx{max-width:min(220px,calc(100vw - 32px));font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  .stm,.mbub,.mring,.mchip,.mbub svg,.mbub .mtx,.mchip button{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  .mn{display:none!important}
+}
+.thinking-reduced-motion .stm,.thinking-reduced-motion .mbub,.thinking-reduced-motion .mring,.thinking-reduced-motion .mchip,
+.thinking-reduced-motion .mbub svg,.thinking-reduced-motion .mbub .mtx,.thinking-reduced-motion .mchip button{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+.thinking-reduced-motion .mn{display:none!important}
