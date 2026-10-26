@@ -76,7 +76,7 @@ export function initMascot(S, audio, api) {
   document.body.append(ring, bub, btn);
   const q = (c) => btn.querySelector('.' + c), E = Object.fromEntries('bd sh fl fr an bu el er mo al al2 hl ar ar2 hr mc bi fg mn'.split(' ').map((c) => [c, q(c)]));
   const pps = btn.querySelectorAll('.pp'), bsvg = bub.querySelector('svg'), tt = bub.querySelector('b'), gg = bub.querySelector('i');
-  let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, noteT = 0, told = new Set(), queue = [], lastIdx = S.rec.index, needleT = 0, tapN = 0, welcomed = false, tourT = performance.now() + 9000, mx = -1, my = -1;
+  let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, bubbleSeq = 0, speechBusy = false, noteT = 0, told = new Set(), queue = [], lastIdx = S.rec.index, needleT = 0, tapN = 0, welcomed = false, tourT = performance.now() + 9000, mx = -1, my = -1;
   const M = { mad: 0, pet: 0, petting: 0, eff: 0, grip: null, fing: 0, mon: 0, mode: 'walk', vx: 0, vy: 0, vr: 0, rot: 0, sq: 0, peak: 0, dizzy: 0, wide: 0, hx: 0, hy: 0, jp: null, dc: null, dance: 0, struggle: 0, sway: 0, run: 0, x: 0, y: 0, face: 1, pop: 0, ph: 0, mic: 0, micT: 0, o: 0, ot: 0, w: .5, wt: .5, lx: 0, ly: 0, nb: 2, bl: 0, sleep: 0, sit: 0, sp: 0, glad: 0, go: null, tgt: null, hold: 0,
     L: { a: 102, l: 22, ta: 102, tl: 22 }, Rm: { a: 78, l: 22, ta: 78, tl: 22 } };
   const REST = [[102, 22], [78, 22]], arms = (l, r) => { if (l) [M.L.ta, M.L.tl] = l; if (r) [M.Rm.ta, M.Rm.tl] = r; };
@@ -148,17 +148,42 @@ export function initMascot(S, audio, api) {
     bsvg.setAttribute('width', w + 2 * m); bsvg.setAttribute('height', h + 2 * m); bsvg.innerHTML = shape(kind, w, h, tip); bub.style.transform = `translate(${p.x - m}px,${p.y - m}px)`;
   }
   function show(text, kind) {
+    clearTimeout(ht); ht = 0;
     bub.hidden = false; bub.className = 'mbub ' + kind; tt.textContent = ''; gg.textContent = text;
     const b = bub.querySelector('.mtx'); B = { w: b.offsetWidth, h: b.offsetHeight, kind, text }; place();
   }
-  const hide = () => { bub.hidden = true; B = null; M.hold = 0; ring.hidden = true; M.tgt = null; };
-  async function say(text, kind, g, hold) {
-    show(text, kind);
-    if (text === '…') { tt.innerHTML = '<span class="dd"><i></i><i></i><i></i></span>'; gg.textContent = ''; await wait(hold ?? 1100, g); hide(); return; }
-    for (let i = 1; i <= text.length; i++) { tt.textContent = text.slice(0, i); gg.textContent = text.slice(i); [M.ot, M.wt] = visemeOf(text[i - 1].toLowerCase()); await wait(/[.,!?…]/.test(text[i - 1]) ? 140 : 34, g); }
-    M.ot = .05; await wait(hold ?? 1300 + text.length * 45, g); hide();
+  function dismissBubble(id) {
+    if (id != null && id !== bubbleSeq) return;
+    clearTimeout(ht); ht = 0; bub.hidden = true; B = null; M.hold = 0; ring.hidden = true; M.tgt = null; speechBusy = false;
   }
-  function blurt(text, kind = 'say', ms = 1500) { show(text, kind); tt.textContent = text; gg.textContent = ''; setTimeout(() => { if (B && B.text === text) hide(); }, ms); }   // instant bubble, for reactions that can't wait
+  const hide = () => { bubbleSeq++; dismissBubble(); };
+  async function say(text, kind, g, hold) {
+    const id = ++bubbleSeq; speechBusy = true; clearTimeout(ht); ht = 0; show(text, kind);
+    try {
+      if (text === '…') {
+        tt.innerHTML = '<span class="dd"><i></i><i></i><i></i></span>'; gg.textContent = '';
+        await wait(Math.max(hold ?? 0, 1500), g); dismissBubble(id); return;
+      }
+      for (let i = 1; i <= text.length; i++) {
+        tt.textContent = text.slice(0, i); gg.textContent = text.slice(i);
+        [M.ot, M.wt] = visemeOf(text[i - 1].toLowerCase());
+        const c = text[i - 1];
+        await wait(/[.!?…]/.test(c) ? 240 : /[,;:—]/.test(c) ? 160 : c === ' ' ? 24 : 48, g);
+      }
+      M.ot = .05;
+      const words = text.trim().split(/\s+/).filter(Boolean).length;
+      const readingPause = Math.max(1600, words * 220, text.length * 24);
+      await wait(Math.max(hold ?? 0, readingPause), g); dismissBubble(id);
+    } catch (err) {
+      dismissBubble(id); throw err;
+    }
+  }
+  function blurt(text, kind = 'say', ms = 1500) {
+    // A physical reaction may happen while a line is being read. Never replace that line mid-sentence.
+    if (speechBusy || (!bub.hidden && B)) return;
+    const id = ++bubbleSeq; speechBusy = true; show(text, kind); tt.textContent = text; gg.textContent = '';
+    ht = setTimeout(() => dismissBubble(id), Math.max(ms, 1500));
+  }
 
   /* ── behaviours ── */
   const notes = () => { if (reduce) return; const e = Object.assign(document.createElement('span'), { className: 'mn', textContent: pick(['♪', '♫']) }); const r = E.hr.getBoundingClientRect(); e.style.cssText = `left:${r.left + R(-10, 14)}px;top:${r.top - 10}px;--dx:${R(-22, 22)}px;--r:${R(-25, 25)}deg`; document.body.append(e); e.onanimationend = () => e.remove(); };
@@ -176,13 +201,38 @@ export function initMascot(S, audio, api) {
     }
     M.micT = 0;
   }
-  /* ── hands-on: reach, hop, tour (only when asked), pranks, disc ride, physics ── */
-  let tourOn = false, tourStop = false, pr = false, prankAt = performance.now() + 20000, pokeAt = 0, born = performance.now(), drag = null, lastHit = '', chipExp = 0, chipP = { x: -9, y: -9 };
+  /* ── hands-on: reach, hop, opt-in tour, record antics, physics ── */
+  let tourOn = false, tourStop = false, pr = false, nextIdleAnticAt = performance.now() + 20000, pokeAt = 0, born = performance.now(), drag = null, lastHit = '', chipExp = 0, chipP = { x: -9, y: -9 };
   const PROPS = [['plant', 0, 0, 165, 250], ['books', 750, 0, 941, 290], ['headphones', 0, 960, 62, 1370], ['mug', 872, 1180, 941, 1400], ['sketchbook', 0, 1470, 165, 1672], ['oldbook', 835, 1550, 941, 1672]];
   const props = () => { const sc = $('#scene')?.getBoundingClientRect(); if (!sc) return []; const u = sc.width / 941; return PROPS.map(([n, l, t, r, b]) => ({ n, l: sc.left + l * u, t: sc.top + t * u, r: sc.left + r * u, b: sc.top + b * u })); };
-  const nearTo = (tx, ty, w = 0) => { const rs = rects(), c = spots(rs); for (const k of [w / 2 + 50, w / 2 + 90, w / 2 + 130]) for (let a = 0; a < 360; a += 20) { const x = tx + Math.cos((a * Math.PI) / 180) * k, y = ty + Math.sin((a * Math.PI) / 180) * k * .8 + BH * .5; if (inV(x, y) && !hit(x, y, rs)) c.push({ x, y }); } c.sort((a, b) => Math.hypot(a.x - tx, a.y - BH * .5 - ty) - Math.hypot(b.x - tx, b.y - BH * .5 - ty)); return c[0]; };
-  const nearSpot = (el) => { const r = el.getBoundingClientRect(), tx = r.left + r.width / 2, ty = r.top + r.height / 2; return { r, tx, ty, s: nearTo(tx, ty, r.width) }; };
-  const reach = (tx, ty, max = 60) => { const u = size / 140, a = Math.atan2(ty - (M.y - 52 * u), tx - (M.x + 38 * u * M.face)), d = Math.hypot(tx - M.x, ty - M.y); arms(null, [((M.face > 0 ? a : Math.PI - a) * 180) / Math.PI, cl(d / u - 22, 18, max)]); };
+  const nearTo = (tx, ty, w = 0) => {
+    const rs = rects(), c = spots(rs), base = Math.max(BW + 7, w / 2 + BW + 6);
+    for (const k of [base, base + 22, base + 44]) for (let a = 0; a < 360; a += 15) {
+      const x = tx + Math.cos((a * Math.PI) / 180) * k;
+      const y = ty + Math.sin((a * Math.PI) / 180) * k * .8 + BH * .5;
+      if (inV(x, y) && !hit(x, y, rs)) c.push({ x, y });
+    }
+    c.sort((a, b) => Math.hypot(a.x - tx, a.y - BH * .5 - ty) - Math.hypot(b.x - tx, b.y - BH * .5 - ty));
+    return c[0];
+  };
+  const nearSpot = (el) => {
+    const r = el.getBoundingClientRect();
+    // Aim at the nearest visible edge, not the centre of a wide text block (which causes rubber arms).
+    const tx = cl(M.x, r.left + Math.min(5, r.width / 2), r.right - Math.min(5, r.width / 2));
+    const cy = M.y - BH * .55;
+    const ty = cl(cy, r.top + Math.min(5, r.height / 2), r.bottom - Math.min(5, r.height / 2));
+    return { r, tx, ty, s: nearTo(tx, ty, 0) };
+  };
+  const reach = (tx, ty, max = 52) => {
+    const u = size / 140, ax = M.x + 38 * u * M.face, ay = M.y - 50 * u;
+    const dx = (tx - ax) * M.face, dy = ty - ay;
+    const d = Math.hypot(dx, dy) / u, a = Math.atan2(dy, dx) * 180 / Math.PI;
+    arms(null, [a, cl(d, 18, max)]); M.tgt = { x: tx, y: ty };
+  };
+  const handPoint = () => {
+    const u = size / 140, a = M.Rm.a * Math.PI / 180;
+    return { x: M.x + (38 + Math.cos(a) * M.Rm.l) * M.face * u, y: M.y + (-50 + Math.sin(a) * M.Rm.l) * u };
+  };
   const ringOn = (r) => { Object.assign(ring.style, { left: r.left - 6 + 'px', top: r.top - 6 + 'px', width: r.width + 12 + 'px', height: r.height + 12 + 'px' }); ring.hidden = false; };
   const hop = (x, y, g, ms = 650) => new Promise((res, rej) => { M.mode = 'jump'; M.jp = { x0: M.x, y0: M.y, x1: x, y1: y, t: 0, ms: reduce ? 60 : ms, res, rej, g, h: Math.min(150, 58 + Math.hypot(x - M.x, y - M.y) * .14) }; });
   const until = async (f, g) => { while (!f()) await wait(120, g); };
@@ -190,7 +240,13 @@ export function initMascot(S, audio, api) {
   const hideChip = () => { chip.hidden = true; chipExp = 0; };
   const placeChip = () => { if (chip.hidden) return; const p = bestSpot(chip.offsetWidth, chip.offsetHeight, 10); chipP = { x: M.x, y: M.y }; chip.style.transform = `translate(${p.x}px,${p.y}px)`; };
   const setChip = (text, btns, ms = 0) => { chip.hidden = false; chip.textContent = ''; const s = document.createElement('span'); s.textContent = text; chip.append(s); btns.forEach(([t, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = (e) => { e.stopPropagation(); f(); }; chip.append(b); }); chipExp = ms ? performance.now() + ms : 0; placeChip(); };
-  const offer = () => setChip(hasSeen ? 'quick tour again?' : 'new here? want a quick tour?', [['yes!', () => { hideChip(); queue.push({ k: 'tour' }); interrupt(); }], ['later', () => { hideChip(); queue.push({ k: 'later' }); interrupt(); }]], hasSeen ? 9000 : 16000);
+  const offer = () => {
+    if (guideChoice || !chip.hidden) return;
+    setChip('new here? want a quick tour?', [
+      ['yes!', () => { saveGuideChoice('accepted'); hideChip(); queue.push({ k: 'tour' }); interrupt(); }],
+      ['no thanks', () => { saveGuideChoice('rejected'); hideChip(); }]
+    ]);
+  };
   let raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
   const ease = (p) => p * p * (3 - 2 * p), lerp = (a, b, p) => a + (b - a) * p;
   function hands2(a, b) {                       // both hands onto two screen points (stretchy cartoon arms)
@@ -202,13 +258,13 @@ export function initMascot(S, audio, api) {
   async function operate(el, g, o = {}) {
     const r = el.getBoundingClientRect(), tx = r.left + r.width / 2, ty = r.top + r.height / 2, rc = Math.max(9, Math.min(r.width, r.height) / 2 + 2); op = true;
     try {
-      if (Math.hypot(tx - M.x, ty - (M.y - BH * .5)) > BW + rc + 26) {
+      if (Math.hypot(tx - M.x, ty - (M.y - BH * .5)) > BW + rc + 8) {
         const oth = $$('#power,#volume,#lever,#trim').filter((e) => e !== el).map((e) => e.getBoundingClientRect()), own = [{ l: r.left - 3, t: r.top - 3, r: r.right + 3, b: r.bottom + 3 }];
         const obs = rects().filter((k) => k.n !== 'deck').concat(own), d = rc + BW + 4, c = [];       // never on the control itself or on text; other knobs are avoided when there is room
         const ovl = (x, y) => oth.reduce((s, q) => s + Math.max(0, Math.min(x + BW, q.right) - Math.max(x - BW, q.left)) * Math.max(0, Math.min(y, q.bottom) - Math.max(y - BH, q.top)), 0);
         for (let a = 0; a < 360; a += 15) { const x = tx + Math.cos((a * Math.PI) / 180) * d, y = ty + Math.sin((a * Math.PI) / 180) * d + BH * .5; if (inV(x, y) && !hit(x, y, obs)) c.push({ x, y, sc: ovl(x, y) * .03 + Math.hypot(x - M.x, y - M.y) * .4 }); }
         c.sort((p, q) => p.sc - q.sc);
-        const st = c[0] || nearTo(tx, ty, r.width); if (!st) return;
+        const st = c[0] || nearTo(tx, ty, rc * 2); if (!st) return;
         if (hit(st.x, st.y, rects())) { const w = nearTo(st.x, st.y - BH * .5, 0); if (w) await goTo(w, g, true); await hop(st.x, st.y, g, 520); } else await goTo(st, g, true);
       }
       M.face = tx >= M.x ? 1 : -1; M.grip = { x: tx, y: ty, r: rc, spin: 0 }; M.eff = o.rage ? 1 : .3; await wait(o.rage ? 90 : R(250, 650), g);
@@ -235,24 +291,9 @@ export function initMascot(S, audio, api) {
         await goTo(n.s, g, true); M.face = n.tx >= M.x ? 1 : -1; ringOn(n.r); reach(n.tx, n.ty); await say(text, 'say', g, 700);
         await operate(el, g, mk()); ring.hidden = true; arms(...REST);
       }
-      if (full) { hasSeen = true; try { localStorage.setItem('static.guide', '1'); } catch { /* storage blocked */ } }
-      M.dance = 1; await say(full ? L('proud') : 'that’s that. ask me again anytime.', 'say', g, 2200);
+      if (full) saveGuideChoice('accepted');
+      M.dance = 1; await say(full ? L('proud') : 'that’s that. enjoy the record.', 'say', g, 2200);
     } finally { tourOn = false; M.sway = 0; M.dance = 0; ring.hidden = true; hideChip(); }
-  }
-  async function prank(g) {
-    const kind = pick(['stop', 'lift', 'vol', 'vol', 'trim', 'skip']), el = $({ stop: '#power', lift: '#lever', vol: '#volume', trim: '#trim', skip: '#nextBtn' }[kind]); if (!el) return;
-    pr = true; const v0 = S.volume, t0 = S.trim, i0 = S.rec.index, p0 = S.rec.pos, was = playing;
-    try {
-      if (kind === 'stop') { await operate(el, g, { done: () => api.setMotor(false) }); await say(L('prank'), 'sly', g, 1000); await wait(900, g); await operate(el, g, { quick: true, done: () => api.autoCue() }); }
-      else if (kind === 'lift') { await operate(el, g, { done: () => api.park() }); await say(L('prank'), 'sly', g, 1000); await wait(700, g); await operate(el, g, { quick: true, done: () => api.autoCue() }); }
-      else if (kind === 'vol') { await operate(el, g, { spin: -2, progress: (p) => api.setVolume(lerp(v0, .06, ease(p))) }); await say('shhh…', 'sly', g, 900); await operate(el, g, { quick: true, spin: 3, progress: (p) => api.setVolume(lerp(.06, 1, ease(p))) }); await say('LOUDER!!', 'shout', g, 900); }
-      else if (kind === 'trim') { await operate(el, g, { spin: 2, progress: (p) => api.setTrim(lerp(t0, 6, ease(p))) }); await say('speeeed!', 'sly', g, 1200); await operate(el, g, { quick: true, spin: -3, progress: (p) => api.setTrim(lerp(6, -6, ease(p))) }); await say('…or slooow.', 'sly', g, 1200); }
-      else { await operate(el, g, { quick: true, done: () => api.skipTo((i0 + 1) % S.tracks.length) }); await say('oops. wrong track. or is it?', 'sly', g, 1400); await wait(2600, g); }
-    } finally {            // pranks never leave things broken, even if you grab the bot halfway
-      if (kind === 'vol') api.setVolume(v0); if (kind === 'trim') api.setTrim(t0);
-      if (kind === 'skip') { if (S.rec.index !== i0) api.cueTo(i0, p0); } else if (was && (kind === 'stop' || kind === 'lift') && (!S.motor || S.arm.mode !== 'down')) api.autoCue();
-      pr = false;
-    }
   }
   async function ride(g) {
     const rc = $('#record').getBoundingClientRect(), cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2, R0 = rc.width * .44, th = R(0, TAU), r = R(.3, .65) * R0, s = nearTo(cx, cy, rc.width + 40); if (!s) return;
@@ -324,12 +365,24 @@ export function initMascot(S, audio, api) {
     else if (M.grip) { const G = M.grip, a0 = Math.atan2(M.y - BH * .5 - G.y, M.x - G.x) + G.spin, rr = G.r * .9; hands2({ x: G.x + Math.cos(a0 - .75) * rr, y: G.y + Math.sin(a0 - .75) * rr }, { x: G.x + Math.cos(a0 + .75) * rr, y: G.y + Math.sin(a0 + .75) * rr }); }
     else if (M.dance) { const s = Math.sin(t * 9), c = Math.cos(t * 9), f = [[[-60 + s * 50, 26], [-60 - s * 50, 26]], [[-30 + s * 40, 28], [-150 - s * 40, 28]], [[-100 + c * 30, 34], [-80 - c * 30, 34]], [[-75 + s * 12, 26], [-105 - s * 12, 26]]][M.dance - 1] || [[-60, 26], [-60, 26]]; arms(...f); }
     E.bi.style.display = M.dizzy ? '' : 'none'; if (M.dizzy) E.bi.querySelectorAll('text').forEach((e, i) => { const a = t * 5 + i * 2.09; e.setAttribute('x', 50 + Math.cos(a) * 24); e.setAttribute('y', 2 + Math.sin(a) * 7); });
-    { const sh = md !== 'walk' || tourOn || curious || op || raging || M.sleep || !!M.go || !!M.grip; if (mq.hidden !== sh) mq.hidden = sh; if (!sh) mq.style.transform = `translate(${M.x + BW * .5}px,${M.y - BH - 8}px)`; }
     if (!chip.hidden) { if (chipExp && performance.now() > chipExp) hideChip(); else if (Math.hypot(chipP.x - M.x, chipP.y - M.y) > 8) placeChip(); }
   }
 
   /* ── curiosity: lift the real record with both hands, inspect it, spin it, toss it, put it back ── */
-  let curious = false, hasSeen = false; try { hasSeen = localStorage.getItem('static.guide') === '1'; } catch { /* storage blocked */ }
+  let curious = false, guideChoice = '';
+  try {
+    const saved = localStorage.getItem('static.guide.choice.v1');
+    const legacyDone = localStorage.getItem('static.guide') === '1';
+    guideChoice = saved === 'accepted' || saved === 'rejected' ? saved : legacyDone ? 'accepted' : '';
+    if (!saved && legacyDone) localStorage.setItem('static.guide.choice.v1', 'accepted');
+  } catch { /* storage unavailable: this visit still remembers the choice in memory */ }
+  function saveGuideChoice(choice) {
+    guideChoice = choice;
+    try {
+      localStorage.setItem('static.guide.choice.v1', choice);
+      if (choice === 'accepted') localStorage.setItem('static.guide', '1');
+    } catch { /* storage unavailable on this device/browser */ }
+  }
   const D = { el: null, W: 1, x: 0, y: 0, s: 1, a: 0, spin: 0, lift: 0, p: 1, ms: 1, from: { x: 0, y: 0, s: 1 }, to: () => ({ x: 0, y: 0, s: 1 }), hold: false };
   function discFrame(dt) {
     if (!D.el) return; D.a += D.spin * dt; if (D.p < 1) D.p = Math.min(1, D.p + (dt * 1000) / D.ms);
@@ -357,27 +410,28 @@ export function initMascot(S, audio, api) {
     if (!rage) { M.dance = 1; await say(L('back'), 'say', g, 1500); }
   }
   async function prod(g) {
-    const el = $(pick(['.tagline', '#title', '#artist', '.links'])); if (!el || !el.offsetWidth) return;
-    const n = nearSpot(el); if (!n.s) return; await goTo(n.s, g, true); M.face = n.tx >= M.x ? 1 : -1; reach(n.tx, n.ty, 50); await wait(500, g);
-    el.classList.add('m-wob'); setTimeout(() => el.classList.remove('m-wob'), 900); await say(L('prod'), 'sly', g, 1100);
+    const el = $(pick(['.tagline', '#title', '#artist'])); if (!el || !el.offsetWidth) return;
+    const n = nearSpot(el); if (!n.s) return; await goTo(n.s, g, true); M.face = n.tx >= M.x ? 1 : -1; reach(n.tx, n.ty, 52); M.tgt = { x: n.tx, y: n.ty }; await wait(620, g);
+    const h = handPoint(), r = n.r, touching = h.x >= r.left - 11 && h.x <= r.right + 11 && h.y >= r.top - 11 && h.y <= r.bottom + 11;
+    if (touching) { el.classList.add('m-wob'); setTimeout(() => el.classList.remove('m-wob'), 900); await say(L('prod'), 'sly', g, 1100); }
+    else { M.tgt = null; arms(...REST); await wait(250, g); }
   }
-  const mq = Object.assign(document.createElement('button'), { className: 'mq', type: 'button', textContent: '?', hidden: true }); mq.setAttribute('aria-label', 'Ask Static to show you a part of the page'); document.body.append(mq);
-  on(mq, 'click', (e) => { e.stopPropagation(); if (tourOn) return; setChip('show me…', [['power', 0], ['needle', 1], ['volume', 2], ['seek', 3], ['songs', 4], ['all', -1]].map(([t, i]) => [t, () => { hideChip(); queue.push({ k: 'tour', only: i }); interrupt(); }]).concat([['✕', hideChip]]), 12000); });
   on(bub.querySelector('.mtx'), 'click', () => { if (!tourOn && !curious) interrupt(); });   // tap a bubble to dismiss it
   async function antic(g) {
-    const k = pick(reduce ? ['look', 'chat', 'yawn', 'stretch', 'hum'] : ['look', 'chat', 'chat', 'yawn', 'stretch', 'hum', 'spin', 'dance', 'dance', 'rage']);
+    const k = pick(reduce ? ['look', 'chat', 'yawn', 'stretch', 'hum'] : ['look', 'chat', 'chat', 'yawn', 'stretch', 'hum', 'spin', 'dance', 'dance', 'surprise']);
     if (k === 'look') { M.tgt = { x: R(0, innerWidth), y: R(0, innerHeight) }; await wait(R(1200, 2400), g); M.tgt = null; }
     else if (k === 'stretch') { arms([-70, 30], [-110, 30]); await wait(1100, g); arms(...REST); }
     else if (k === 'yawn') { M.ot = 1; M.wt = .3; await wait(1300, g); M.ot = 0; }
     else if (k === 'spin' && !reduce) { M.sp = 1; await wait(900, g); }
     else if (k === 'chat') await say(L('chat'), 'say', g);
     else if (k === 'dance') { M.dance = 1; await wait(3200, g); M.dance = 0; }
+    else if (k === 'surprise') { M.wide = 1; M.glad = 1; arms([-125, 30], [-55, 30]); await wait(480, g); M.wide = 0; arms(...REST); await wait(220, g); }
     else if (k === 'rage') { btn.classList.add('mad'); await say(L('angry'), 'angry', g, 900); btn.classList.remove('mad'); }
     else await say(L('sing'), 'think', g, 900);
     await wait(R(900, 2200), g);
   }
   async function wander(g) {
-    if (!reduce && Math.random() < .2) return prod(g);
+    if (!reduce && Math.random() < .08) return prod(g);
     const rs = rects(), sp = spots(rs); if (!sp.length || reduce) { await antic(g); return; }
     const home = sp.find((s) => s.kind === 'home'), t = home && Math.random() < .2 ? home : pick(sp);
     await goTo(t, g); M.sit = t.kind === 'edge' ? 1 : 0;
@@ -388,14 +442,13 @@ export function initMascot(S, audio, api) {
     if (a.k === 'move') return goTo(a, g, true);
     if (a.k === 'tour') return tour(g, a.only);
     if (a.k === 'ride') return ride(g);
-    if (a.k === 'prank') return prank(g);
     if (a.k === 'inspect') return inspect(g);
     if (a.k === 'prod') return prod(g);
     if (a.k === 'tantrum') return tantrum(g);
     if (a.k === 'annoyed') return annoyed(g);
     if (a.k === 'later') return say('okay. i’m right here. tap me anytime.', 'say', g, 1400);
     if (a.k === 'tap') {
-      const n = tapN++; M.glad = 1; M.sit = 0; if (n % 5 === 4) offer();
+      const n = tapN++; M.glad = 1; M.sit = 0; 
       if (a.hard) { M.sq = .7; arms([-60, 28], [-60, 28]); await say(L('hurt'), 'shout', g, 1000); }
       else if (n % 4 === 1 && !playing && !reduce) { M.micT = 1; M.hold = 1; arms(null, [138, 30]); notes(); await say(L('mic'), 'think', g, 1400); M.hold = 0; M.micT = 0; }
       else { if (n % 3 === 0 && !reduce) M.sp = 1; arms([-60, 28], [-60, 28]); await say(L('tap'), 'say', g); }
@@ -408,14 +461,31 @@ export function initMascot(S, audio, api) {
     while (M.mode !== 'walk') await wait(140, g);
     const now = performance.now(); if (!playing && !M.hold) M.micT = 0; arms(...REST); M.tgt = null; M.dance = 0; M.sway = 0; M.fing = 0;
     if (queue.length) return run(queue.shift(), g);
-    if (!welcomed) { welcomed = true; arms(null, [-62, 30]); await say(L('hi'), 'say', g, 1800); return offer(); }
-    if (chipExp && !chip.hidden) { await wait(500, g); return; }
-    if (!reduce && now > prankAt && now - idleAt > 3500 && now - born > 18000 && !M.petting) { prankAt = now + R(22000, 48000); return playing ? prank(g) : Math.random() < .5 && !S.motor && S.arm.mode === 'parked' ? inspect(g) : ride(g); }
+    if (!welcomed) { welcomed = true; arms(null, [-62, 30]); await say(L('hi'), 'say', g, 1800); if (!guideChoice) offer(); return; }
+    if (!chip.hidden) { await wait(500, g); return; }
+    if (!reduce && now > nextIdleAnticAt && now - idleAt > 10000 && now - born > 18000 && !M.petting) {
+      // Idle antics may inspect the record, but must never change the user's switches, volume or speed.
+      nextIdleAnticAt = now + R(30000, 55000);
+      if (!playing && !S.motor && S.arm.mode === 'parked' && Math.random() < .32) return inspect(g);
+    }
     if (playing) return perform(g);
     if (now - idleAt > 40000) { await say('…', 'think', g, 700); M.sleep = 1; show('zZz…', 'sleepy'); return wait(6e5, g); }
     return wander(g);
   }
-  async function loop() { while (alive) { const g = ++gen; try { await decide(g); } catch (e) { if (e !== 'x') console.warn(e); hide(); btn.classList.remove('mad'); M.dance = 0; M.sway = 0; M.fing = 0; M.grip = null; M.eff = 0; await new Promise((r) => setTimeout(r, 80)); } } }
+  async function loop() {
+    while (alive) {
+      const g = ++gen;
+      try { await decide(g); }
+      catch (e) {
+        if (e !== 'x') console.warn(e);
+        hide(); btn.classList.remove('mad');
+        M.dance = 0; M.sway = 0; M.fing = 0; M.grip = null; M.eff = 0; M.micT = 0;
+        M.hold = 0; M.ot = 0; M.wt = .5; M.wide = 0; M.tgt = null;
+        arms(...REST);
+        await new Promise((r) => setTimeout(r, 80));
+      }
+    }
+  }
 
   /* ── frame: smooth everything, then write the SVG ── */
   function frame(now) {
@@ -453,7 +523,14 @@ export function initMascot(S, audio, api) {
   }
 
   /* ── wiring ── */
-  const activity = () => { idleAt = performance.now(); if (M.sleep) { queue.unshift({ k: 'wake' }); interrupt(); } };
+  const activity = () => {
+    idleAt = performance.now();
+    if (M.sleep) {
+      M.sleep = 0; hide();
+      if (!queue.some((a) => a.k === 'wake')) queue.unshift({ k: 'wake' });
+      interrupt();
+    }
+  };
   const grab = () => { interrupt(); M.go = null; M.jp = null; M.dc = null; M.grip = null; M.mode = 'held'; M.micT = 0; M.peak = 0; M.petting = 0; btn.classList.add('held'); setTimeout(() => { if (M.mode === 'held') { show(L('scared'), 'shout'); tt.textContent = B.text; gg.textContent = ''; } }, 90); };
   let pt = 0;
   on(btn, 'pointerdown', (e) => { e.preventDefault(); btn.setPointerCapture(e.pointerId); drag = { id: e.pointerId, x: e.clientX, y: e.clientY, px: e.clientX, py: e.clientY, t0: performance.now(), moved: false, pet: false, hist: [] }; activity(); clearTimeout(pt); pt = setTimeout(() => { if (drag && !drag.moved && !tourOn) { drag.pet = true; M.petting = 1; } }, 520); });   // hold still = gentle petting
@@ -479,7 +556,7 @@ export function initMascot(S, audio, api) {
   };
   on(btn, 'pointerup', (e) => drop(e, false)); on(btn, 'pointercancel', (e) => drop(e, true));
   on(btn, 'click', (e) => { if (e.detail === 0 && !tourOn) { queue.push({ k: 'tap' }); interrupt(); } });
-  on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,.mq,button,[role],a,#deckFit') || tourOn || reduce || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
+  on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,button,[role],a,#deckFit') || tourOn || reduce || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
   on(window, 'pointermove', (e) => { if (e.pointerType === 'mouse') { mx = e.clientX; my = e.clientY; } idleAt = performance.now(); if (M.sleep) activity(); });
   on(window, 'keydown', () => { activity(); if (curious) interrupt(); }); on(window, 'scroll', activity, { passive: true });
   let rt = 0; on(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { measure(); if (M.mode === 'walk' && !op && !raging && !curious && (hit(M.x, M.y, rects()) || !inV(M.x, M.y))) { const s = spots(rects()); if (s.length) { const p = pick(s); M.x = p.x; M.y = p.y; interrupt(); } } }, 160); });
@@ -488,5 +565,5 @@ export function initMascot(S, audio, api) {
   measure(); const sp = spots(rects()), home = sp.find((s) => s.kind === 'home'), s0 = (home && Math.random() < .5 ? home : pick(sp.filter((s) => s.kind !== 'home')) || home) || { x: innerWidth / 2, y: innerHeight - 12 };
   M.x = s0.x; M.y = s0.y; M.sit = s0.kind === 'edge' ? 1 : 0; btn.classList.add('on'); requestAnimationFrame(frame); setTimeout(loop, reduce ? 300 : 1100);
   if (location.search.includes('debug')) window.__static = { M, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, queue, interrupt, chip, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, hit, BW: () => BW, BH: () => BH };
-  return () => { mq.remove(); chip.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearTimeout(ht); btn.remove(); bub.remove(); ring.remove(); };
+  return () => { chip.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearTimeout(ht); btn.remove(); bub.remove(); ring.remove(); };
 }

@@ -74,3 +74,11 @@ A silent little pet that lives on the page (no mic, no speech, no network; plain
 - **Mischief, always undone.** About every 20-50 s while music plays it stops the motor, lifts the needle, drops or blasts the volume, twists the speed trim or skips a track, then puts it back. Tune the timing at `prankAt` in `decide`.
 - Dialogue lives in `LINES` (shuffle-bag, no repeats back to back). Bubbles are soft floating clouds; tap one to dismiss it.
 - `prefers-reduced-motion`: no wandering, pranks or rides. Keyboard: it is a focusable button. Add `?debug` to the URL to expose `window.__static`.
+
+## Mascot v7 polish pass
+
+- Guide acceptance/rejection is saved on the visitor’s device with `localStorage` (`static.guide.choice.v1`); it is not stored on a server.
+- The floating `?` shortcut and unsolicited idle switch/volume/speed pranks are removed.
+- Speech uses slower character timing and a minimum reading pause; quick reactions do not replace an active line.
+- Mascot reach/approach uses nearby target geometry and mirrored arm coordinates to reduce distant pointing and false contact.
+- Waking clears sleep immediately, and interrupted actions reset transient face/arm/mouth states.

@@ -374,11 +374,9 @@ a{color:inherit}
 .mchip button{font:700 12px system-ui,sans-serif;border:0;border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer;background:#d9b47a;color:#1d140e}.mchip button+button{background:transparent;color:#6b5a48}
 @keyframes mshake{50%{transform:translate(1px,-1px) rotate(.6deg)}}
 
-/* Static v3: lifted record, ? badge, mood bubbles, tap-to-dismiss */
+/* Static v3: lifted record, mood bubbles, tap-to-dismiss */
 .mdisc{position:fixed;left:0;top:0;z-index:39;pointer-events:none;border-radius:50%;will-change:transform;filter:drop-shadow(0 8px 10px rgba(0,0,0,.55))}
 .mdisc .record{position:absolute}
-.mq{position:fixed;left:0;top:0;z-index:41;width:24px;height:24px;padding:0;border-radius:50%;border:1.5px solid #1d140e;background:#d9b47a;color:#1d140e;font:800 13px/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.4);touch-action:manipulation}
-.mq[hidden]{display:none}.mq::after{content:"";position:absolute;inset:-10px}
 .mbub .mtx{pointer-events:auto;cursor:pointer}
 .mbub.angry .mtx{font:700 14px/1.2 "Segoe Script","Bradley Hand","Snell Roundhand","Comic Sans MS",cursive;font-style:normal;color:#7a1810;animation:mshake .13s infinite}
 .mbub.sly .mtx{color:#3d3208}.mbub.sleepy .mtx{color:#233646;font-weight:500}
