@@ -360,6 +360,13 @@ a{color:inherit}
 .stm:focus-visible{outline:2px dashed #d9b47a;outline-offset:4px;border-radius:14px}
 .stm.motion-reduced{transition:none!important}
 .stm[data-state="sleeping"]{filter:saturate(.78) brightness(.94)}
+/* Small material cues: keep the original bronze character, but make its idle state feel less flat. */
+.stm svg{filter:drop-shadow(0 5px 8px rgba(0,0,0,.18))}
+.stm[data-state="idle"]{filter:drop-shadow(0 2px 5px rgba(0,0,0,.12))}
+.stm[data-state="speaking"] .bd{transform-origin:50% 80%;}
+.stm[data-state="guiding"]{filter:drop-shadow(0 0 7px rgba(217,180,122,.16))}
+.stm:focus-visible{outline-offset:5px;box-shadow:0 0 0 3px rgba(217,180,122,.2)}
+
 .mbub{position:fixed;left:0;top:0;z-index:41;pointer-events:none;will-change:transform;filter:drop-shadow(0 5px 9px rgba(0,0,0,.35));animation:mpop .24s cubic-bezier(.3,1.45,.5,1)}
 .mbub[hidden],.mring[hidden],.mchip[hidden],.mrestore[hidden]{display:none!important}
 .mbub svg{position:absolute;left:0;top:0;overflow:visible;filter:drop-shadow(0 7px 10px rgba(0,0,0,.36)) drop-shadow(0 0 10px rgba(255,236,190,.13));animation:mfloat 3.2s ease-in-out infinite}

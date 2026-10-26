@@ -26,6 +26,7 @@ const LINES = {
   prod: ['it’s heavier than it looks.', 'typo? no. perfect.', 'boop. the words wobble.', 'these letters are ticklish.'],
   proud: ['tour complete. i’m kind of a big deal.', 'five stars. i’d rate myself five stars.', 'you’re welcome. now go play.'],
   effort: ['nngh…', 'hnnnngh!', 'c’mon c’mon c’mon…', 'it’s stuck… no wait, it’s not.', 'heavy! who made this?', 'just. a. little. more…', 'push! push! push!'],
+  easter: ['secret move unlocked. never saw that.', 'the groove has chosen me.', '…did you see that? no? good.', 'one tiny victory dance. carry on.'],
   purr: ['mmm… right there.', 'ahhh. okay that’s nice.', 'purr purr (i’m not a cat).', 'more. more. don’t stop.', 'you’re hired. forever. 💛', 'my favourite human 💛'],
   hurt: ['OW!', 'ouch! that hurt!', 'hey!! not so hard!', 'my head!!', 'bonk. rude.'],
   rage: ['#@$%&!! WHO DID THAT?!', 'I’LL BREAK THIS WHOLE %$#@ DECK!', 'ARGH!! *!@#$%^&*', 'you %@#$! you stupid &*$#!', 'GRRRR. @#$%!!', 'I. AM. NOT. A. DRUM!! $#@%'],
@@ -89,7 +90,7 @@ export function initMascot(S, audio, api) {
   btn.classList.toggle('motion-reduced', reduce);
   document.documentElement.classList.toggle('thinking-reduced-motion', reduce);
   const pps = btn.querySelectorAll('.pp'), bsvg = bub.querySelector('svg'), tt = bub.querySelector('b'), gg = bub.querySelector('i');
-  let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, bubbleSeq = 0, speechBusy = false, queue = [], lastIdx = S.rec.index, tapN = 0, welcomed = false, mx = -1, my = -1, actionState = 'boot';
+  let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, bubbleSeq = 0, speechBusy = false, queue = [], lastIdx = S.rec.index, tapN = 0, welcomed = false, mx = -1, my = -1, actionState = 'boot', lastBeatAt = 0, lastLevel = 0, hoverTarget = null, lastHoverReact = 0, lastEggAt = 0;
   const M = { mad: 0, pet: 0, petting: 0, eff: 0, grip: null, fing: 0, mon: 0, mode: 'walk', vx: 0, vy: 0, vr: 0, rot: 0, sq: 0, peak: 0, dizzy: 0, wide: 0, hx: 0, hy: 0, jp: null, dc: null, dance: 0, struggle: 0, sway: 0, run: 0, x: 0, y: 0, face: 1, pop: 0, ph: 0, mic: 0, micT: 0, o: 0, ot: 0, w: .5, wt: .5, lx: 0, ly: 0, nb: 2, bl: 0, sleep: 0, sit: 0, sp: 0, glad: 0, go: null, tgt: null, hold: 0,
     L: { a: 102, l: 22, ta: 102, tl: 22 }, Rm: { a: 78, l: 22, ta: 78, tl: 22 } };
   const REST = [[102, 22], [78, 22]], arms = (l, r) => { if (l) [M.L.ta, M.L.tl] = l; if (r) [M.Rm.ta, M.Rm.tl] = r; };
@@ -123,7 +124,7 @@ export function initMascot(S, audio, api) {
   }
   function spots(rs) {
     const out = [], add = (x, y, kind) => inV(x, y) && !hit(x, y, rs) && out.push({ x, y, kind });
-    rs.forEach((r) => [.2, .5, .8].forEach((f) => add(r.l + (r.r - r.l) * f, r.t, 'edge')));
+    rs.forEach((r) => [.2, .5, .8].forEach((f) => add(r.l + (r.r - r.l) * f, r.t, r.n === 'deck' ? 'perch' : 'edge')));
     for (let i = 0; i < 14; i++) add(R(BW + 8, innerWidth - BW - 8), R(BH + 8, innerHeight - 8), 'floor');
     const sc = $('#scene')?.getBoundingClientRect(); if (sc) add(sc.left + sc.width / 2, sc.top + sc.height * .115, 'home');   // where the old title used to be
     return out;
@@ -501,7 +502,10 @@ export function initMascot(S, audio, api) {
   }
   on(bub.querySelector('.mtx'), 'click', () => { if (!tourOn && !curious) interrupt(); });   // tap a bubble to dismiss it
   async function antic(g) {
-    const k = pick(reduce ? ['look', 'chat', 'yawn', 'stretch', 'hum'] : ['look', 'chat', 'chat', 'yawn', 'stretch', 'hum', 'spin', 'dance', 'dance', 'surprise', 'wave', 'shrug', 'tilt']);
+    const now = performance.now();
+    const eggReady = !reduce && !quietMode && now - lastEggAt > 90000 && Math.random() < .035;
+    const k = eggReady ? 'easter' : pick(reduce ? ['look', 'chat', 'yawn', 'stretch', 'hum'] : ['look', 'chat', 'chat', 'yawn', 'stretch', 'hum', 'spin', 'dance', 'dance', 'surprise', 'wave', 'shrug', 'tilt']);
+    if (eggReady) lastEggAt = now;
     if (k === 'look') { M.tgt = { x: R(0, innerWidth), y: R(0, innerHeight) }; await wait(R(1200, 2400), g); M.tgt = null; }
     else if (k === 'stretch') { arms([-70, 30], [-110, 30]); await wait(1100, g); arms(...REST); }
     else if (k === 'yawn') { M.ot = 1; M.wt = .3; await wait(1300, g); M.ot = 0; }
@@ -512,6 +516,7 @@ export function initMascot(S, audio, api) {
     else if (k === 'wave') { await say(pick(['oh, hey.', 'you still here? nice.', 'hi again.']), 'say', g, 350); for (let i = 0; i < 3; i++) { arms(null, [-122 + (i % 2 ? 22 : -8), 26]); await wait(240, g); } arms(...REST); }
     else if (k === 'shrug') { M.wide = .25; arms([-58, 25], [-124, 25]); await wait(850, g); arms(...REST); M.wide = 0; }
     else if (k === 'tilt') { M.rot = M.face * 10; M.tgt = mx >= 0 ? { x: mx, y: my } : { x: M.x + 80 * M.face, y: M.y - 60 }; await wait(650, g); M.rot = 0; M.tgt = null; await wait(180, g); }
+    else if (k === 'easter') { M.wide = 1; M.glad = 1; arms([-128, 30], [-48, 30]); await wait(220, g); M.wide = 0; M.dance = 1; M.sp = 1; await wait(1150, g); M.dance = 0; arms([-55, 25], [-125, 25]); await wait(260, g); arms(...REST); await say(L('easter'), 'sly', g, 1000); }
     else if (k === 'rage') { btn.classList.add('mad'); await say(L('angry'), 'angry', g, 900); btn.classList.remove('mad'); }
     else await say(L('sing'), 'think', g, 900);
     await wait(R(900, 2200), g);
@@ -519,9 +524,12 @@ export function initMascot(S, audio, api) {
   async function wander(g) {
     if (!reduce && Math.random() < .08) return prod(g);
     const rs = rects(), sp = spots(rs); if (!sp.length || reduce) { await antic(g); return; }
-    const home = sp.find((s) => s.kind === 'home'), t = home && Math.random() < .2 ? home : pick(sp);
-    await goTo(t, g); M.sit = t.kind === 'edge' ? 1 : 0;
+    const restSpots = sp.filter((s) => ['edge', 'perch', 'home'].includes(s.kind));
+    const home = sp.find((s) => s.kind === 'home'), t = home && Math.random() < .2 ? home : restSpots.length && Math.random() < .58 ? pick(restSpots) : pick(sp);
+    await goTo(t, g); M.sit = ['edge', 'perch', 'home'].includes(t.kind) ? 1 : 0;
+    if (M.sit) { M.face = M.x < innerWidth * .5 ? 1 : -1; arms([-82, 19], [-96, 18]); await wait(R(650, 1300), g); }
     for (let i = 0, n = 1 + ((R(0, 2)) | 0); i < n; i++) await antic(g);
+    if (M.sit) { arms(...REST); M.sit = 0; }
   }
   async function run(a, g) {
     if (M.sleep || a.k === 'wake') { M.sleep = 0; await say(L('wake'), 'say', g); return; }
@@ -601,12 +609,20 @@ export function initMascot(S, audio, api) {
       lv = audio.level ? cl(audio.level(), 0, 1) : 0;
       // Speech owns the mouth while a bubble is being read; music only lip-syncs when there is real signal.
       if (!speechBusy) { M.ot = cl((lv - .025) * 2.15, 0, .88); M.wt = .45 + lv * .22; }
-    }
+      // React to a real transient, not every animation frame: tiny shoulder bounce / note, never a control action.
+      const beatNow = performance.now();
+      if (!reduce && !quietMode && !tourOn && !speechBusy && lv > .24 && lv - lastLevel > .12 && beatNow - lastBeatAt > 520) {
+        lastBeatAt = beatNow; M.glad = Math.max(M.glad, .28); M.sway = Math.max(M.sway, .22);
+        if (lv > .48 && Math.random() < .22) notes();
+      }
+      lastLevel = lv;
+    } else { lastLevel = 0; }
+    if (M.sway > 0 && M.sway < .35) M.sway = Math.max(0, M.sway - dt * .72);
     M.o += (M.ot - M.o) * (1 - Math.pow(1e-4, dt)); M.w += (M.wt - M.w) * k; M.glad = Math.max(0, M.glad - dt * .8); M.sp = Math.max(0, M.sp - dt * 1.3);
     if ((!playing || speechBusy) && !B && !M.hold && !M.go) { M.ot = Math.max(0, M.ot - dt * 1.4); } M.mic += (M.micT - M.mic) * k;
     // eyes
     M.nb -= dt; if (M.nb < 0) { M.bl = 1; M.nb = R(2, 5); } M.bl = Math.max(0, M.bl - dt * 7);
-    const hx = M.x, hy = M.y - BH * .55, activePointer = mx >= 0 && performance.now() - idleAt < 4200, tg = M.tgt || (activePointer ? { x: mx, y: my } : null);
+    const hx = M.x, hy = M.y - BH * .55, activePointer = mx >= 0 && performance.now() - idleAt < 4200, tg = M.tgt || hoverTarget || (activePointer ? { x: mx, y: my } : null);
     const lx = tg ? cl((tg.x - hx) / 180, -1, 1) * M.face : Math.sin(t * .7) * .12, ly = tg ? cl((tg.y - hy) / 180, -1, 1) : Math.sin(t * .53) * .08; M.lx += (lx - M.lx) * k; M.ly += (ly - M.ly) * k;
     const es = M.sleep ? .08 : Math.max(.08, 1 - Math.sin(M.bl * Math.PI)) * (1 - M.glad * .35);
     const ew = 1 + M.wide * .25, an = 14 * Math.min(1, M.mad) + (M.mon > .5 ? 10 : 0); E.el.setAttribute('transform', `translate(34 46)rotate(${an})scale(${ew} ${es * ew})`); E.er.setAttribute('transform', `translate(66 46)rotate(${-an})scale(${ew} ${es * ew})`);
@@ -615,7 +631,7 @@ export function initMascot(S, audio, api) {
     pps.forEach((p) => { p.setAttribute('cx', M.lx * 3.6); p.setAttribute('cy', M.ly * 4); });
     E.mo.setAttribute('d', mouthD(M.sleep ? .1 : M.o, M.w));
     // arms + mic
-    const sw = (M.tgt || M.grip || tourOn) ? 0 : Math.sin(t * 1.7) * 2.5, A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
+    const sw = (M.tgt || M.grip || tourOn) ? 0 : Math.sin(t * (M.sit ? 1.05 : 1.7)) * (M.sit ? 1.1 : 2.5), A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
     A(M.L, E.al, E.hl, 12, 1, E.al2); const [hxr, hyr] = A(M.Rm, E.ar, E.hr, 88, -1, E.ar2);
     E.mc.setAttribute('transform', `translate(${hxr} ${hyr})rotate(-36)scale(${M.mic})`); E.mc.style.display = M.mic > .03 ? '' : 'none'; E.fg.style.display = M.fing ? '' : 'none'; if (M.fing) E.fg.setAttribute('transform', `translate(${hxr} ${hyr})`);
     E.an.setAttribute('transform', `rotate(${Math.sin(t * (M.sleep ? .7 : 3)) * (M.sleep ? 1.4 : 5) + lv * 14} 34 12)`); E.bu.setAttribute('opacity', playing ? .35 + lv * .35 : .48 + Math.sin(t * 1.4) * .2);
@@ -623,9 +639,9 @@ export function initMascot(S, audio, api) {
     const walk = !!M.go, gait = walk ? Math.sin(M.ph) : 0;
     const hop = reduce ? 0 : walk ? Math.abs(gait) * 4.6 : M.dance || M.run ? Math.abs(Math.sin(t * 9)) * (4 + 10 * (playing ? Math.max(.3, lv) : .7)) : 0;
     const breath = M.sleep ? Math.sin(t * .65) * 1.1 : Math.sin(t * 2) * .8;
-    const bob = hop + (playing ? lv * 3 : breath) + (M.sit && !walk ? 4 : 0), fx = Math.cos((1 - M.sp) * TAU);
+    const bob = hop + (playing ? lv * 3 : breath) + (M.sit && !walk ? 5.5 : 0), fx = Math.cos((1 - M.sp) * TAU);
     E.bd.setAttribute('transform', `rotate(${M.rot + (walk ? gait * 3.2 : 0)} 50 84)translate(50 118)scale(${M.face * (M.sp ? fx : 1) * sc * pop} ${sc * pop * (1 + (walk ? Math.sin(M.ph * 2) * .03 : Math.sin(t * (M.sleep ? .65 : 2)) * .012))})translate(-50 -118)translate(0 ${-bob})`);
-    const sw2 = walk ? gait * 4.5 : M.mode === 'held' || M.struggle || M.run ? Math.sin(t * 24) * 7 : M.sit ? Math.sin(t * 3) * 2 : 0;
+    const sw2 = walk ? gait * 4.5 : M.mode === 'held' || M.struggle || M.run ? Math.sin(t * 24) * 7 : M.sit ? Math.sin(t * 1.7) * .8 : 0;
     E.fl.setAttribute('cx', 35 + (walk ? gait * 1.4 : 0)); E.fr.setAttribute('cx', 65 - (walk ? gait * 1.4 : 0));
     E.fl.setAttribute('cy', 113 + sw2); E.fr.setAttribute('cy', 113 - sw2); E.sh.setAttribute('opacity', .5 * sc);
     const jx = M.eff ? Math.sin(t * 55) * 1.4 * M.eff : raging ? Math.sin(t * 40) * 2 : 0, mk = Math.round(Math.min(1.5, M.mad) * 20), key = mk * 100 + Math.round(M.mon * 10) * 10 + Math.round(M.pet * 5);
@@ -665,6 +681,7 @@ export function initMascot(S, audio, api) {
   const drop = (e, cancel) => {
     if (!drag || e.pointerId !== drag.id) return; const d = drag; drag = null; clearTimeout(pt); clearTimeout(menuPt); M.petting = 0; btn.classList.remove('held');
     if (!d.moved) {
+      hoverTarget = null; M.tgt = null;
       if (!d.options && !cancel && !d.pet && !tourOn && !raging) { const now = performance.now(), gap = now - lastTapAt, hard = gap < 750; lastTapAt = now; M.mad = Math.min(1.7, M.mad + (hard ? .3 : gap < 1800 ? .14 : .05)); queue.push(M.mad >= 1 ? { k: 'tantrum' } : { k: 'tap', hard }); interrupt(); }   // rapid taps hurt; too many and it snaps
       return;
     }
@@ -676,6 +693,14 @@ export function initMascot(S, audio, api) {
   on(btn, 'pointerup', (e) => drop(e, false)); on(btn, 'pointercancel', (e) => drop(e, true));
   on(btn, 'contextmenu', (e) => { e.preventDefault(); if (!tourOn) { hide(); showOptions(); } });
   on(btn, 'click', (e) => { if (e.detail === 0 && !tourOn) { queue.push({ k: 'tap' }); interrupt(); } });
+  on(document, 'pointerover', (e) => {
+    const el = e.target.closest && e.target.closest('#power,#volume,#lever,#trim,.seek,.seek__knob,.dot,#record,.skip');
+    if (!el || quietMode || hiddenByUser || tourOn) return;
+    const r = el.getBoundingClientRect(); hoverTarget = { x: r.left + r.width / 2, y: r.top + r.height / 2 }; M.tgt = hoverTarget;
+    const now = performance.now();
+    if (!reduce && now - lastHoverReact > 9000 && !speechBusy && bub.hidden && M.mode === 'walk' && !M.go && Math.random() < .22) { lastHoverReact = now; M.wide = .35; setTimeout(() => { M.wide = Math.max(0, M.wide - .35); }, 550); }
+  }, { capture: true });
+  on(document, 'pointerout', (e) => { const from = e.target.closest && e.target.closest('#power,#volume,#lever,#trim,.seek,.seek__knob,.dot,#record,.skip'); const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('#power,#volume,#lever,#trim,.seek,.seek__knob,.dot,#record,.skip'); if (from && !to) { hoverTarget = null; if (!op && !tourOn && !curious && !M.grip) M.tgt = null; } }, { capture: true });
   on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,.mrestore,button,[role],a,#deckFit') || tourOn || reduce || quietMode || hiddenByUser || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
   on(window, 'pointermove', (e) => { if (e.pointerType === 'mouse') { mx = e.clientX; my = e.clientY; } idleAt = performance.now(); if (M.sleep) activity(); });
   on(window, 'keydown', () => { activity(); if (curious) interrupt(); }); on(window, 'scroll', activity, { passive: true });
