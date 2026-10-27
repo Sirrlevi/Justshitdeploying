@@ -266,12 +266,12 @@ function bindDial(node, { get, set, range, arc, detent = 0, label }) {
 }
 
 try { const v = parseFloat(localStorage.getItem('deck.volume')); if (v >= 0 && v <= 1) S.volume = v; } catch { /* storage unavailable */ }
-bindDial(el.volume, {
+const paintVolume = bindDial(el.volume, {
   get: () => S.volume,
   set: (v) => { S.volume = v; audio.setVolume(v); try { localStorage.setItem('deck.volume', v.toFixed(3)); } catch { /* ignore */ } },
   range: [0, 1], arc: [-135, 135], label: (v) => v * 100
 });
-bindDial(el.trim, {
+const paintTrim = bindDial(el.trim, {
   get: () => S.trim, set: (v) => { S.trim = v; },
   range: [-1, 1], arc: [-135, 135], detent: 0.07, label: (v) => v * 6
 });
@@ -623,6 +623,14 @@ const fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready
 const imagesReady = Promise.all([...document.images].map((i) => (i.decode ? i.decode().catch(() => {}) : Promise.resolve())));
 Promise.race([Promise.all([fontsReady, imagesReady]), new Promise((r) => setTimeout(r, 1500))])
   .then(() => requestAnimationFrame(() => document.body.classList.add('is-ready')))
-  .then(() => setTimeout(() => initMascot(S, audio, { setMotor, park, autoCue, skipTo, cueTo, setVolume: (v) => { S.volume = v; audio.setVolume(v); }, setTrim: (v) => { S.trim = v; } }), 1400));   // after the deck has settled, so it never perches on a moving edge
+  .then(() => setTimeout(() => initMascot(S, audio, {
+    setMotor, park, autoCue, skipTo, cueTo,
+    setVolume: (v) => { S.volume = Math.max(0, Math.min(1, v)); audio.setVolume(S.volume); paintVolume(); },          // the knob turns on screen too
+    setTrim: (v) => { S.trim = Math.max(-1, Math.min(1, v)); paintTrim(); },                                           // trim runs -1…1 (shown as -6…6)
+    lever: () => leverToggle(), theta: () => A.theta, thetaFor: (i, p) => thetaForRec(i, p),
+    armStart: () => { S.grab = { id: -99, ang0: 0, theta0: A.theta, theta: A.theta, x0: 0, y0: 0, t0: performance.now(), moved: true, mode0: A.mode }; pickUp(); el.armSvg.classList.add('is-grabbing'); },     // carry the tonearm like a finger would
+    armMove: (th) => { if (S.grab && S.grab.id === -99) S.grab.theta = clamp(th, THETA_MIN, THETA_IN); },
+    armDrop: () => { const g = S.grab; if (g && g.id === -99) { S.grab = null; el.armSvg.classList.remove('is-grabbing'); dropAt(g.theta); } },
+  }), 1400));   // after the deck has settled, so it never perches on a moving edge
 
 if (location.search.includes('debug')) window.__deck = { S, audio };
