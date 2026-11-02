@@ -316,6 +316,17 @@ export function initMascot(S, audio, api) {
       mood('happy', 3); M.dance = 1; await say(L('proud'), 'say', g, 2000);
     } finally { tourOn = false; M.sway = 0; M.dance = 0; ring.hidden = true; hideChip(); }
   }
+  // closest free spot to the engraving: right under the deck edge, head almost touching the letters, never covering them
+  function standNear(t, tr) {
+    const rs = rects(), deck = rs.find((k) => k.n === 'deck'), best = { d: 1e9, p: null }, top = deck ? deck.b : t.y + 10;
+    for (let dx = -140; dx <= 140; dx += 2) for (let dy = 2; dy <= 90; dy += 4) {
+      const x = t.x + dx, y = top + BH + dy;
+      if (!inV(x, y) || hit(x, y, rs)) continue;
+      if (x + BW > tr.left - 8 && x - BW < tr.right + 8 && y > tr.top - 8 && y - BH < tr.bottom + 8) continue;     // never stand on the letters
+      const d = Math.hypot(x - t.x, (y - BH * .8) - t.y) + dy * .4; if (d < best.d) { best.d = d; best.p = { x, y }; }
+    }
+    return best.p;
+  }
   async function torchEaster(g) {
     const giveUp = () => { torchTries++; torchBackoff = performance.now() + 60000; return false; };   // never retry in a hot loop
     const engraving = $('.engrave');
@@ -324,7 +335,7 @@ export function initMascot(S, audio, api) {
     const textRect = range.getBoundingClientRect();
     if (textRect.width < 4 || textRect.height < 4) return giveUp();
     const target = { x: textRect.left + textRect.width / 2, y: textRect.top + textRect.height / 2 };
-    const stand = nearTo(target.x, target.y, 0);
+    const stand = standNear(target, textRect) || nearTo(target.x, target.y, 0);
     if (!stand) return giveUp();
 
     const lines = [visitorName ? `${visitorName}, look here.` : 'psst… look here.', 'wait… see this?', 'i found something.'];
@@ -335,29 +346,31 @@ export function initMascot(S, audio, api) {
       mood('curious', 2); M.tgt = target;
       guard(12000);                                   // walking limit
       await goTo(stand, g, true);
-      guard(7000);                                    // the show itself is short; if anything stalls, it is cut off cleanly
+      guard(14000);                                   // the show is ~9s; if anything stalls, it is cut off cleanly
 
       M.face = target.x >= M.x ? 1 : -1; M.tgt = target; mood('curious', 2);
-      await say(pick(lines), 'say', g, 120);
+      await say(pick(lines), 'say', g, 200);
 
-      reach(target.x, target.y, 90);
-      await wait(220, g);
-      torchAim = target; reach(target.x, target.y, 92);        // torch comes up in the hand
-      await wait(240, g);
+      // 1) point at the name with a bare hand
+      reach(target.x, target.y, 62);
+      await wait(900, g);
+      // 2) bring the torch up
+      torchAim = target; reach(target.x, target.y, 34);   // torch held back a little so the beam, not the lens, covers the letters
+      await wait(450, g);
 
-      // the light is on: from now on this visit counts as seen, even if something interrupts it
+      // 3) light on: from now on this visit counts as seen, even if something interrupts it
       torchSeenEver = true; torchVisited = true;
       storageMark('local', TORCH_KEY); storageMark('session', TORCH_VISIT);
       torchLit = true; engraving.classList.add('torch-lit');
-
-      for (let i = 0; i < 3; i++) {                   // one short sweep across the letters
-        const p = i / 2;
+      await wait(700, g);
+      for (let i = 0; i < 5; i++) {                   // slow sweep across the letters, left to right and back
+        const p = i < 3 ? i / 2 : 1 - (i - 2) / 2;
         torchAim = { x: textRect.left + textRect.width * p, y: target.y };
-        M.tgt = torchAim; reach(torchAim.x, torchAim.y, 92);
-        await wait(150, g);
+        M.tgt = torchAim; reach(torchAim.x, torchAim.y, 34);
+        await wait(520, g);
       }
-      torchAim = target; M.tgt = target;
-      await wait(900, g);
+      torchAim = target; M.tgt = target; mood('happy', 2);
+      await wait(1800, g);                            // hold on the name so it can be read
       completed = true;
     } finally {
       clearTimeout(torchGuard);
@@ -367,6 +380,9 @@ export function initMascot(S, audio, api) {
       engraving.classList.remove('torch-lit');
       M.tgt = null; M.tilt = 0; M.go = null;
       arms(...REST); mood('happy', 1.2);
+      // back to normal life: forget the engraving, fresh idle clock, pranks/dance/songs/doodle can start again soon
+      M.sit = 0; M.sleep = 0; M.micT = 0; M.dance = 0; M.sway = 0; M.nod = 0; M.shake = 0; M.fing = 0; M.grip = null; M.eff = 0;
+      idleAt = performance.now(); prankAt = Math.min(prankAt, performance.now() + 9000);
     }
     return completed;
   }
@@ -717,7 +733,7 @@ export function initMascot(S, audio, api) {
     if (!reduce && Math.random() < .14) return shove(g);
     const rs = rects(), sp = spots(rs); if (!sp.length || reduce) { await antic(g); return; }
     const home = sp.find((s) => s.kind === 'home'), t = home && Math.random() < .2 ? home : pick(sp);
-    await goTo(t, g); M.sit = t.kind === 'edge' ? 1 : 0;
+    await goTo(t, g, true); M.sit = t.kind === 'edge' ? 1 : 0;      // no walkable path (boxed in by deck/text)? hop out instead of failing silently forever
     for (let i = 0, n = 1 + ((R(0, 2)) | 0); i < n; i++) await antic(g);
   }
   async function run(a, g) {

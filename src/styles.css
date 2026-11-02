@@ -436,7 +436,7 @@ a{color:inherit}
 .mtl-spot{z-index:44;width:150px;height:64px;margin:-32px 0 0 -75px;border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,226,158,.5) 0%,rgba(255,206,124,.22) 36%,rgba(255,196,110,.06) 56%,transparent 72%)}
 .mtl-spot.lit{opacity:1;animation:mtlIgnite .5s linear both}
 @keyframes mtlIgnite{0%{opacity:0}14%{opacity:1}26%{opacity:.2}40%{opacity:1}52%{opacity:.55}68%,100%{opacity:1}}
-.engrave.torch-lit{color:#c79d66;text-shadow:0 0 2px rgba(255,236,186,.9),0 0 8px rgba(255,214,140,.65),0 0 16px rgba(255,190,105,.3);transition:color .25s ease,text-shadow .25s ease}
+.engrave.torch-lit{color:#ffdfae;text-shadow:0 0 2px rgba(255,246,214,1),0 0 7px rgba(255,214,140,.95),0 0 16px rgba(255,186,96,.7),0 0 30px rgba(255,160,70,.4);transition:color .3s ease,text-shadow .3s ease}
 @keyframes mshake{50%{transform:translate(1px,-1px) rotate(.6deg)}}
 
 /* Static v3: lifted record, ? badge, mood bubbles, tap-to-dismiss */
