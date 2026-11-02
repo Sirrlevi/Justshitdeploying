@@ -331,7 +331,7 @@ export function initMascot(S, audio, api) {
     gs = { s: 'new', asked: gs.asked + 1 }; gset(gs);
     setChip('new here? want a quick tour?', [['yes!', () => { gs = { s: 'accepted', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'tour' }); interrupt(); }], ['no thanks', () => { gs = { s: 'declined', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'later' }); interrupt(); }]], 16000);
   };
-  let songSince = 0, skipHandled = false, restDue = performance.now() + 55000, nextDoodleAt = performance.now() + 22000, fingAt = 0, ringAt = 0, lastTick = performance.now(), wLast = 'walk', wSince = performance.now(), raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
+  let reaskDone = false, songSince = 0, skipHandled = false, restDue = performance.now() + 55000, nextDoodleAt = performance.now() + 22000, fingAt = 0, ringAt = 0, lastTick = performance.now(), wLast = 'walk', wSince = performance.now(), raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
   const ease = (p) => p * p * (3 - 2 * p), lerp = (a, b, p) => a + (b - a) * p;
   function hands2(a, b) {                       // both hands onto two screen points (stretchy cartoon arms)
     const u = size / 140, hs = [a, b].map((p) => [50 + ((p.x - M.x) / u) * M.face, 118 + (p.y - M.y) / u]).sort((p, q) => p[0] - q[0]), A2 = ([sx, sy], px) => [(Math.atan2(sy - 68, sx - px) * 180) / Math.PI, Math.hypot(sx - px, sy - 68)];
@@ -463,19 +463,22 @@ export function initMascot(S, audio, api) {
     return completed;
   }
   function freeDoodleSpot(w, h) {
-    const sc = $('#scene')?.getBoundingClientRect(); if (!sc || sc.width < 80 || sc.height < 120) return null;
-    const blockers = rects().map((r) => ({ l: r.l - 5, t: r.t - 5, r: r.r + 5, b: r.b + 5 }));
-    const addBlock = (el, pad = 8) => { if (!el || el.hidden) return; const r = el.getBoundingClientRect(); if (r.width > 1 && r.height > 1) blockers.push({ l: r.left - pad, t: r.top - pad, r: r.right + pad, b: r.bottom + pad }); };
-    addBlock(btn, 10); addBlock(bub, 8); addBlock(chip, 8); addBlock(ring, 8);
-    const candidates = [], xs = [.18, .5, .82], ys = [.09, .15, .22, .77, .84, .91];
-    for (const fy of ys) for (const fx of xs) {
-      const left = cl(sc.left + sc.width * fx - w / 2, sc.left + 8, sc.right - w - 8);
-      const top = cl(sc.top + sc.height * fy - h / 2, sc.top + 8, sc.bottom - h - 8);
-      const box = { l: left, t: top, r: left + w, b: top + h };
-      const blocked = blockers.some((r) => box.l < r.r && box.r > r.l && box.t < r.b && box.b > r.t);
-      if (!blocked) candidates.push({ x: left, y: top, w, h });
+    // scan the whole viewport: text and controls must stay clear; the deck art and props may be written over (it is chalk on a desk)
+    const hard = [], soft = [];
+    rects().forEach((r) => (r.n ? soft : hard).push({ l: r.l - 4, t: r.t - 4, r: r.r + 4, b: r.b + 4 }));
+    const addHard = (el, pad = 8) => { if (!el || el.hidden) return; const r = el.getBoundingClientRect(); if (r.width > 1 && r.height > 1) hard.push({ l: r.left - pad, t: r.top - pad, r: r.right + pad, b: r.bottom + pad }); };
+    addHard(btn, 10); addHard(bub, 8); addHard(chip, 8); addHard(ring, 8);
+    const ov = (x, y, k) => Math.max(0, Math.min(x + w, k.r) - Math.max(x, k.l)) * Math.max(0, Math.min(y + h, k.b) - Math.max(y, k.t));
+    if (w > innerWidth - 16) return null;
+    let best = null, bs = 1e18;
+    for (let fy = .06; fy <= .94; fy += .04) for (let fx = .08; fx <= .92; fx += .08) {
+      const x = cl(innerWidth * fx - w / 2, 8, innerWidth - w - 8), y = cl(innerHeight * fy - h / 2, 8, innerHeight - h - 8);
+      if (hard.some((k) => ov(x, y, k) > 0)) continue;
+      const sc = soft.reduce((n, k) => n + ov(x, y, k), 0) + Math.abs(fx - .5) * 400 + Math.abs(fy - .5) * -40;     // prefer empty desk, then little prop overlap, then the middle
+      if (sc < bs) { bs = sc; best = { x, y, w, h }; }
     }
-    return candidates.length ? pick(candidates) : null;
+    if (!best) console.warn('[mascot] no free spot for the name doodle');
+    return best;
   }
 
   function autographStrokePaths(character, rect) {
@@ -887,6 +890,9 @@ export function initMascot(S, audio, api) {
       else nextDoodleAt = performance.now() + 20000;
       return;
     }
+    if (!visitorName && !reaskDone && !playing && quiet > 14000 && now - born > 40000 && !tourOn && !pr && !raging && !op && !M.petting && !M.sleep) {      // never got a name: ask once more before nodding off
+      reaskDone = true; nameSkipped = false; mood('curious', 2); await say('psst… i never got your name. tell me, and i’ll write it in chalk for you.', 'say', g, 800); openNamePanel(); return;
+    }
     if (!playing && quiet > 30000) { mood('sleepy', 6); M.ot = 1; M.wt = .3; M.nod = 1; await wait(1500, g); M.ot = 0; await wait(1300, g); M.nod = 0; M.sleep = 1; show('zZz…', 'sleepy'); return wait(6e5, g); }        // yawns, nods off, then sleeps until touched
     if (!reduce && now > prankAt && (playing || quiet > 3500) && (playing || quiet < 26000) && now - born > 18000 && !M.petting) { prankAt = now + R(22000, 48000); return playing ? prank(g) : Math.random() < .5 && !S.motor && S.arm.mode === 'parked' ? inspect(g) : ride(g); }
     if (playing && now > restDue) return rest(g);
@@ -1042,6 +1048,6 @@ export function initMascot(S, audio, api) {
 
   measure(); const sp = spots(rects()), home = sp.find((s) => s.kind === 'home'), s0 = (home && Math.random() < .5 ? home : pick(sp.filter((s) => s.kind !== 'home')) || home) || { x: innerWidth / 2, y: innerHeight - 12 };
   M.x = s0.x; M.y = s0.y; M.sit = s0.kind === 'edge' ? 1 : 0; btn.classList.add('on'); requestAnimationFrame(frame); setTimeout(loop, reduce ? 300 : 1100);
-  if (location.search.includes('debug')) window.__static = { M, get pr() { return pr; }, setIdle: (ms) => { idleAt = performance.now() - ms; interrupt(); }, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, queue, interrupt, chip, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, hit, BW: () => BW, BH: () => BH };
+  if (location.search.includes('debug')) window.__static = { M, get pr() { return pr; }, setIdle: (ms) => { idleAt = performance.now() - ms; interrupt(); }, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, queue, interrupt, chip, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, doodle: () => { born = performance.now() - 60000; nextDoodleAt = 0; interrupt(); }, hit, BW: () => BW, BH: () => BH };
   return () => { mq.remove(); chip.remove(); namePanel.remove(); nameDoodle.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearInterval(watch); clearTimeout(ht); clearTimeout(doodleFadeTimer); clearTimeout(doodleHideTimer); btn.remove(); bub.remove(); ring.remove(); rig.remove(); spot.remove(); $('.engrave')?.classList.remove('torch-lit'); };
 }
