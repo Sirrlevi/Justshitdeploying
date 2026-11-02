@@ -71,11 +71,33 @@ export function initMascot(S, audio, api) {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches, ac = new AbortController();
   const on = (t, e, f, o) => t.addEventListener(e, f, { signal: ac.signal, ...o });
   const btn = Object.assign(document.createElement('button'), { className: 'stm', type: 'button', innerHTML: SVG });
+  // Flashlight: ONE fixed rig that sits on the real hand, turned by the real screen angle toward the target.
+  // Torch body + beam live in the same rotated frame, so the light always leaves the lens. Transform/opacity only (no layout per frame).
+  const rig = Object.assign(document.createElement('div'), { className: 'mtl', innerHTML: '<div class="mtl__beam"></div><div class="mtl__prop"><i class="mtl__grip"></i><i class="mtl__head"></i><i class="mtl__lens"></i><i class="mtl__fist"></i></div>' });
+  const spot = Object.assign(document.createElement('div'), { className: 'mtl-spot' });
+  rig.setAttribute('aria-hidden', 'true'); spot.setAttribute('aria-hidden', 'true');
+  const rigBeam = rig.querySelector('.mtl__beam'), rigProp = rig.querySelector('.mtl__prop');
+  const chalk = Object.assign(document.createElement('span'), { className: 'mchalk' });
+  chalk.setAttribute('aria-hidden', 'true'); btn.append(chalk);
+  const namePanel = Object.assign(document.createElement('form'), { className: 'mname', hidden: true });
+  namePanel.setAttribute('aria-label', 'Choose the name the mascot should call you');
+  namePanel.innerHTML = '<span class="mname__ask">hey! what should i call you?</span><input class="mname__input" type="text" name="nickname" maxlength="24" autocomplete="nickname" placeholder="your name" aria-label="Your name"><small class="mname__privacy">kept only on this browser</small><div class="mname__actions"><button class="mname__save" type="submit">save</button><button class="mname__later" type="button">not now</button></div>';
+  const nameInput = namePanel.querySelector('.mname__input'), nameLater = namePanel.querySelector('.mname__later');
+  const nameDoodle = Object.assign(document.createElement('div'), { className: 'mname-doodle', hidden: true });
+  nameDoodle.setAttribute('aria-hidden', 'true');
+  const nameDoodleText = Object.assign(document.createElement('span'), { className: 'mname-doodle__text' });
+  const nameHeart = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  nameHeart.setAttribute('class', 'mname-doodle__heart'); nameHeart.setAttribute('viewBox', '0 0 72 56');
+  nameHeart.setAttribute('aria-hidden', 'true'); nameHeart.setAttribute('hidden', '');
+  nameHeart.innerHTML = '<path d="M36 48C29 40 8 28 8 17 8 7 20 3 27 10L36 19 45 10C52 3 64 7 64 17 64 28 43 40 36 48Z"/>';
+  nameDoodle.append(nameDoodleText, nameHeart);
   btn.setAttribute('aria-label', 'Static, the little mascot. Tap to poke it, or drag to carry it.');
   const bub = Object.assign(document.createElement('div'), { className: 'mbub', hidden: true, innerHTML: '<svg></svg><div class="mtx"><b></b><i></i></div>' });
   bub.setAttribute('role', 'status');
   const ring = Object.assign(document.createElement('div'), { className: 'mring', hidden: true });
-  document.body.append(ring, bub, btn);
+  document.body.append(ring, bub, btn, spot, rig, namePanel, nameDoodle);
+  btn.classList.add('on');
+  btn.style.transform = `translate3d(${Math.max(8, innerWidth / 2 - 36)}px,${Math.max(64, innerHeight * .16)}px,0)`;
   const q = (c) => btn.querySelector('.' + c), E = Object.fromEntries('bd sh fl fr an bu el er mo mo2 al al2 hl ar ar2 hr mc bi fg mn brs bl br tg'.split(' ').map((c) => [c, q(c)]));
   const pps = btn.querySelectorAll('.pp'), bsvg = bub.querySelector('svg'), tt = bub.querySelector('b'), gg = bub.querySelector('i');
   const lids = [...btn.querySelectorAll('.lid')], los = [...btn.querySelectorAll('.lo')];
@@ -94,8 +116,10 @@ export function initMascot(S, audio, api) {
     const out = [], add = (r, p = 5, n) => r.width > 1 && r.height > 1 && out.push({ l: r.left - p, t: r.top - p, r: r.right + p, b: r.bottom + p, n });
     const d = $('#deckFit'); if (d) add(d.getBoundingClientRect(), 0, 'deck'); props().forEach((p) => out.push(p));
     const tx = (e) => { const g = document.createRange(); g.selectNodeContents(e); return g.getBoundingClientRect(); };
-    $$('.title,.artist,.tagline,.hint.show,.seek__t,.dot span').forEach((e) => add(tx(e)));
+    document.querySelectorAll('.domain,.sub,.title,.artist,.tagline,.hint.show,.seek__t,.dot span').forEach((e) => add(tx(e)));
     $$('.skip,.seek,.dot,.links a').forEach((e) => add(e.getBoundingClientRect()));
+    if (!namePanel.hidden) add(namePanel.getBoundingClientRect(), 6, 'name-panel');
+    if (!nameDoodle.hidden && !nameDoodle.classList.contains('measuring')) add(nameDoodle.getBoundingClientRect(), 6, 'name-doodle');
     return out;
   }
   const hit = (x, y, rs) => rs.some((k) => x - BW < k.r && x + BW > k.l && y - BH < k.b - .01 && y > k.t + .01);
@@ -183,7 +207,8 @@ export function initMascot(S, audio, api) {
     M.micT = 0;
   }
   /* ── hands-on: reach, hop, tour (only when asked), pranks, disc ride, physics ── */
-  let tourOn = false, tourStop = false, pr = false, prankAt = performance.now() + 20000, pokeAt = 0, born = performance.now(), drag = null, lastHit = '', chipExp = 0, chipP = { x: -9, y: -9 };
+  let tourOn = false, tourStop = false, pr = false, prankAt = performance.now() + 20000, pokeAt = 0, born = performance.now(), drag = null, lastHit = '', chipExp = 0, chipP = { x: -9, y: -9 }, chipPinned = false;
+  let torchAim = null, torchLit = false, torchInProgress = false, torchStartedAt = 0, torchTries = 0, torchBackoff = 0, torchGuard = 0, chalkAim = null, doodleFadeTimer = 0, doodleHideTimer = 0;
   const PROPS = [['plant', 0, 0, 165, 250], ['books', 750, 0, 941, 290], ['headphones', 0, 960, 62, 1370], ['mug', 872, 1180, 941, 1400], ['sketchbook', 0, 1470, 165, 1672], ['oldbook', 835, 1550, 941, 1672]];
   const props = () => { const sc = $('#scene')?.getBoundingClientRect(); if (!sc) return []; const u = sc.width / 941; return PROPS.map(([n, l, t, r, b]) => ({ n, l: sc.left + l * u, t: sc.top + t * u, r: sc.left + r * u, b: sc.top + b * u })); };
   const nearTo = (tx, ty, w = 0) => { const rs = rects(), c = spots(rs); for (const k of [w / 2 + 50, w / 2 + 90, w / 2 + 130]) for (let a = 0; a < 360; a += 20) { const x = tx + Math.cos((a * Math.PI) / 180) * k, y = ty + Math.sin((a * Math.PI) / 180) * k * .8 + BH * .5; if (inV(x, y) && !hit(x, y, rs)) c.push({ x, y }); } c.sort((a, b) => Math.hypot(a.x - tx, a.y - BH * .5 - ty) - Math.hypot(b.x - tx, b.y - BH * .5 - ty)); return c[0]; };
@@ -193,13 +218,39 @@ export function initMascot(S, audio, api) {
   const hop = (x, y, g, ms = 650, ah) => new Promise((res, rej) => { M.mode = 'jump'; M.jp = { x0: M.x, y0: M.y, x1: x, y1: y, t: 0, ms: reduce ? 60 : ms, res, rej, g, h: ah ?? Math.min(150, 58 + Math.hypot(x - M.x, y - M.y) * .14) }; });
   const until = async (f, g) => { while (!f()) await wait(120, g); };
   const chip = Object.assign(document.createElement('div'), { className: 'mchip', hidden: true }); document.body.append(chip);
-  const hideChip = () => { chip.hidden = true; chipExp = 0; };
-  const placeChip = () => { if (chip.hidden) return; const p = bestSpot(chip.offsetWidth, chip.offsetHeight, 10); chipP = { x: M.x, y: M.y }; chip.style.transform = `translate(${p.x}px,${p.y}px)`; };
+  const hideChip = () => { chip.hidden = true; chipExp = 0; chipPinned = false; chip.classList.remove('docked'); chip.style.transform = ''; };
+  const placeChip = () => { if (chip.hidden || chipPinned) return; const p = bestSpot(chip.offsetWidth, chip.offsetHeight, 10); chipP = { x: M.x, y: M.y }; chip.style.transform = `translate(${p.x}px,${p.y}px)`; };
   const setChip = (text, btns, ms = 0) => { chip.hidden = false; chip.textContent = ''; const s = document.createElement('span'); s.textContent = text; chip.append(s); btns.forEach(([t, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = (e) => { e.stopPropagation(); f(); }; chip.append(b); }); chipExp = ms ? performance.now() + ms : 0; placeChip(); };
   const GK = 'static.guide.v1';          // stays on this device: localStorage, with a plain cookie as a fallback. Nothing is sent anywhere.
   const gget = () => { try { const v = JSON.parse(localStorage.getItem(GK)); if (v) return v; if (localStorage.getItem('static.guide') === '1') return { s: 'accepted', asked: 1 }; } catch { /* blocked */ } try { const c = document.cookie.match(/(?:^|; )static_guide=([^;]+)/); if (c) return JSON.parse(decodeURIComponent(c[1])); } catch { /* none */ } return null; };
   const gset = (v) => { const s = JSON.stringify(v); try { localStorage.setItem(GK, s); } catch { /* blocked */ } try { document.cookie = `static_guide=${encodeURIComponent(s)};max-age=31536000;path=/;SameSite=Lax`; } catch { /* blocked */ } };
   let gs = /[?&]tour\b/.test(location.search) ? { s: 'new', asked: 0 } : gget() || { s: 'new', asked: 0 };       // ?tour brings the offer back
+  const NAME_KEY = 'static.visitor-name.v1', NAME_SKIP = 'static.visitor-name.skip.v1';
+  const DOODLE_KEY = 'static.visitor-doodle.v1', DOODLE_VISIT = 'static.visitor-doodle.visit.v1';
+  const tidyName = (value) => String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 24);
+  const readStored = (kind, key) => { try { return (kind === 'local' ? localStorage : sessionStorage).getItem(key) || ''; } catch { return ''; } };
+  const markStored = (kind, key, value = '1') => { try { (kind === 'local' ? localStorage : sessionStorage).setItem(key, value); } catch { /* storage may be disabled */ } };
+  const addressVisitor = (line) => visitorName && Math.random() < .42 ? `${visitorName}, ${line}` : line;
+  let visitorName = tidyName(readStored('local', NAME_KEY));
+  let nameSkipped = readStored('session', NAME_SKIP) === '1';
+  let doodleSeenEver = readStored('local', DOODLE_KEY) === '1';
+  let doodleVisited = readStored('session', DOODLE_VISIT) === '1', doodleRolls = 0;
+  const hideNamePanel = () => { namePanel.hidden = true; namePanel.style.transform = ''; };
+  const placeNamePanel = () => { if (namePanel.hidden) return; const p = bestSpot(namePanel.offsetWidth, namePanel.offsetHeight, 16); namePanel.style.transform = `translate(${p.x}px,${p.y}px)`; };
+  const openNamePanel = () => { nameInput.value = ''; nameInput.setCustomValidity(''); namePanel.hidden = false; requestAnimationFrame(placeNamePanel); };
+  on(namePanel, 'submit', (e) => {
+    e.preventDefault();
+    const value = tidyName(nameInput.value);
+    if (!value) { nameInput.setCustomValidity('enter a name, or choose not now'); nameInput.reportValidity(); return; }
+    visitorName = value; markStored('local', NAME_KEY, visitorName); hideNamePanel();
+    queue.push({ k: 'nameSaved' }); interrupt();
+  });
+  on(nameInput, 'input', () => nameInput.setCustomValidity(''));
+  on(nameLater, 'click', (e) => { e.preventDefault(); nameSkipped = true; markStored('session', NAME_SKIP); hideNamePanel(); queue.push({ k: 'nameLater' }); interrupt(); });
+  const TORCH_KEY = 'static.engraving-torch.v1', TORCH_VISIT = 'static.engraving-torch.visit.v1';
+  const storageHas = (kind, key) => { try { return (kind === 'local' ? window.localStorage : window.sessionStorage).getItem(key) === '1'; } catch { return false; } };
+  const storageMark = (kind, key) => { try { (kind === 'local' ? window.localStorage : window.sessionStorage).setItem(key, '1'); } catch { /* storage may be disabled; in-memory guards still apply */ } };
+  let torchSeenEver = storageHas('local', TORCH_KEY), torchVisited = storageHas('session', TORCH_VISIT), torchRolls = 0;
   const offer = () => {
     if (gs.s !== 'new' || gs.asked >= 3) return;                         // answered once (yes or no) = never asked again; ignored 3 times = stop nagging
     gs = { s: 'new', asked: gs.asked + 1 }; gset(gs);
@@ -255,9 +306,9 @@ export function initMascot(S, audio, api) {
     { sel: () => { const d = $$('.dot'); return d[S.rec.index === d.length - 1 ? 0 : d.length - 1]; }, text: 'and tap a dot to pick another song.', mk: () => ({ quick: true, done: () => api.skipTo(S.rec.index === S.tracks.length - 1 ? 0 : S.tracks.length - 1) }) },
   ];
   async function tour(g) {
-    tourOn = true; tourStop = false; setChip('tour on', [['stop', () => { tourStop = true; interrupt(); }]]);
+    tourOn = true; tourStop = false; chipPinned = true; chip.classList.add('docked'); chip.style.transform = 'none'; setChip('tour on', [['stop', () => { tourStop = true; interrupt(); }]]);
     try {
-      M.face = 1; arms(null, [-62, 30]); mood('happy', 3); await say('okay! follow me. i’ll show you everything.', 'say', g, 800);
+      M.face = 1; arms(null, [-62, 30]); mood('happy', 3); await say(visitorName ? `okay, ${visitorName}. follow me. i’ll show you everything.` : 'okay! follow me. i’ll show you everything.', 'say', g, 800);
       for (const st of STEPS) {
         if (st.when && !st.when()) continue; const el = typeof st.sel === 'function' ? st.sel() : $(st.sel); if (!el) continue;
         if (st.ring !== false) ringOn(el.getBoundingClientRect()); const ok = await operate(el, g, { ...st.mk(), say: st.text }); ring.hidden = true; arms(...REST); if (!ok) await wait(600, g);
@@ -265,6 +316,246 @@ export function initMascot(S, audio, api) {
       mood('happy', 3); M.dance = 1; await say(L('proud'), 'say', g, 2000);
     } finally { tourOn = false; M.sway = 0; M.dance = 0; ring.hidden = true; hideChip(); }
   }
+  async function torchEaster(g) {
+    const giveUp = () => { torchTries++; torchBackoff = performance.now() + 60000; return false; };   // never retry in a hot loop
+    const engraving = $('.engrave');
+    if (!engraving || torchInProgress) return giveUp();
+    const range = document.createRange(); range.selectNodeContents(engraving);
+    const textRect = range.getBoundingClientRect();
+    if (textRect.width < 4 || textRect.height < 4) return giveUp();
+    const target = { x: textRect.left + textRect.width / 2, y: textRect.top + textRect.height / 2 };
+    const stand = nearTo(target.x, target.y, 0);
+    if (!stand) return giveUp();
+
+    const lines = [visitorName ? `${visitorName}, look here.` : 'psst… look here.', 'wait… see this?', 'i found something.'];
+    const guard = (ms) => { clearTimeout(torchGuard); torchGuard = window.setTimeout(() => { if (torchInProgress) interrupt(); }, ms); };
+    let completed = false;
+    torchInProgress = true; torchTries++; torchStartedAt = performance.now(); torchBackoff = torchStartedAt + 60000;
+    try {
+      mood('curious', 2); M.tgt = target;
+      guard(12000);                                   // walking limit
+      await goTo(stand, g, true);
+      guard(7000);                                    // the show itself is short; if anything stalls, it is cut off cleanly
+
+      M.face = target.x >= M.x ? 1 : -1; M.tgt = target; mood('curious', 2);
+      await say(pick(lines), 'say', g, 120);
+
+      reach(target.x, target.y, 90);
+      await wait(220, g);
+      torchAim = target; reach(target.x, target.y, 92);        // torch comes up in the hand
+      await wait(240, g);
+
+      // the light is on: from now on this visit counts as seen, even if something interrupts it
+      torchSeenEver = true; torchVisited = true;
+      storageMark('local', TORCH_KEY); storageMark('session', TORCH_VISIT);
+      torchLit = true; engraving.classList.add('torch-lit');
+
+      for (let i = 0; i < 3; i++) {                   // one short sweep across the letters
+        const p = i / 2;
+        torchAim = { x: textRect.left + textRect.width * p, y: target.y };
+        M.tgt = torchAim; reach(torchAim.x, torchAim.y, 92);
+        await wait(150, g);
+      }
+      torchAim = target; M.tgt = target;
+      await wait(900, g);
+      completed = true;
+    } finally {
+      clearTimeout(torchGuard);
+      torchInProgress = false;
+      torchAim = null; torchLit = false;
+      rig.classList.remove('on', 'lit'); spot.classList.remove('lit');
+      engraving.classList.remove('torch-lit');
+      M.tgt = null; M.tilt = 0; M.go = null;
+      arms(...REST); mood('happy', 1.2);
+    }
+    return completed;
+  }
+  function freeDoodleSpot(w, h) {
+    const sc = $('#scene')?.getBoundingClientRect(); if (!sc || sc.width < 80 || sc.height < 120) return null;
+    const blockers = rects().map((r) => ({ l: r.l - 5, t: r.t - 5, r: r.r + 5, b: r.b + 5 }));
+    const addBlock = (el, pad = 8) => { if (!el || el.hidden) return; const r = el.getBoundingClientRect(); if (r.width > 1 && r.height > 1) blockers.push({ l: r.left - pad, t: r.top - pad, r: r.right + pad, b: r.bottom + pad }); };
+    addBlock(btn, 10); addBlock(bub, 8); addBlock(chip, 8); addBlock(ring, 8);
+    const candidates = [], xs = [.18, .5, .82], ys = [.09, .15, .22, .77, .84, .91];
+    for (const fy of ys) for (const fx of xs) {
+      const left = cl(sc.left + sc.width * fx - w / 2, sc.left + 8, sc.right - w - 8);
+      const top = cl(sc.top + sc.height * fy - h / 2, sc.top + 8, sc.bottom - h - 8);
+      const box = { l: left, t: top, r: left + w, b: top + h };
+      const blocked = blockers.some((r) => box.l < r.r && box.r > r.l && box.t < r.b && box.b > r.t);
+      if (!blocked) candidates.push({ x: left, y: top, w, h });
+    }
+    return candidates.length ? pick(candidates) : null;
+  }
+
+  function autographStrokePaths(character, rect) {
+    const ch = character.toLowerCase();
+    const left = rect.left + rect.width * .17, right = rect.right - rect.width * .17;
+    const top = rect.top + rect.height * .13, bottom = rect.bottom - rect.height * .16;
+    const midX = (left + right) / 2, midY = (top + bottom) / 2;
+    const point = (x, y) => ({ x, y });
+    const ellipse = [];
+    for (let i = 0; i <= 9; i++) {
+      const a = -Math.PI / 2 + i * (Math.PI * 2 / 9);
+      ellipse.push(point(midX + Math.cos(a) * (right - left) * .48, midY + Math.sin(a) * (bottom - top) * .47));
+    }
+    if ('aAeoOcCdDgGqQpPbB'.includes(character)) {
+      const paths = [ellipse];
+      if ('aAeEgG'.includes(character)) paths.push([point(left, midY), point(right, midY)]);
+      return paths;
+    }
+    if ('jJ'.includes(character)) {
+      return [
+        [point(midX + 3, top), point(midX + 2, midY), point(midX, bottom - 1), point(midX - 5, bottom + 2), point(left + 1, bottom - 2)],
+        [point(midX - 2, top - rect.height * .035), point(midX + 3, top - rect.height * .035)]
+      ];
+    }
+    if ('iIl1tTfF'.includes(character)) {
+      const paths = [[point(midX, top), point(midX - 1, midY), point(midX, bottom)]];
+      if ('iI'.includes(character)) paths.push([point(midX - 2, top - rect.height * .04), point(midX + 2, top - rect.height * .04)]);
+      if ('tTfF'.includes(character)) paths.push([point(left, top + rect.height * .26), point(right, top + rect.height * .26)]);
+      return paths;
+    }
+    if ('vVwWxXyYzZkK'.includes(character)) {
+      return 'xX'.includes(character)
+        ? [[point(left, top), point(midX, midY), point(right, bottom)], [point(right, top), point(midX, midY), point(left, bottom)]]
+        : [[point(left, top), point(midX, bottom), point(right, top), point(midX + 1, midY), point(left, bottom)]];
+    }
+    if ('mMnNhHuUrR'.includes(character)) {
+      return [[point(left, bottom), point(left, top), point(midX * .98, midY), point(midX + 2, top), point(right, bottom)]];
+    }
+    return [[point(left, bottom), point(left + rect.width * .12, top), point(midX, midY), point(right - rect.width * .08, top + rect.height * .08), point(right, bottom)]];
+  }
+
+  async function moveChalkAlong(points, duration, g) {
+    if (!points.length) return;
+    const segmentCount = Math.max(1, points.length - 1);
+    for (let segment = 0; segment < segmentCount; segment++) {
+      const a = points[segment], b = points[segment + 1];
+      const steps = 4, beat = duration / (segmentCount * steps);
+      for (let step = 1; step <= steps; step++) {
+        const t = step / steps;
+        const eased = t * t * (3 - 2 * t);
+        const point = { x: a.x + (b.x - a.x) * eased, y: a.y + (b.y - a.y) * eased };
+        M.face = point.x >= M.x ? 1 : -1;
+        M.tgt = point;
+        reach(point.x, point.y, 92);
+        chalkAim = point; chalk.classList.add('on');
+        await wait(beat, g);
+      }
+    }
+  }
+
+  async function writeNameDoodle(g) {
+    if (!visitorName) return false;
+
+    // Build independent, upright glyphs: this is a hand-printed autograph, not joined cursive.
+    nameDoodleText.replaceChildren();
+    const autographSize = cl((innerWidth - 96) / Math.max(1, visitorName.length * .46), 20, 52);
+    nameDoodleText.style.fontSize = `${autographSize}px`;
+    const glyphs = Array.from(visitorName, (character) => {
+      const glyph = document.createElement('span');
+      const isSpace = character === ' ';
+      glyph.className = `mname-glyph${isSpace ? ' is-space' : ''}`;
+      glyph.textContent = isSpace ? '\u00a0' : character;
+      if (!isSpace) {
+        glyph.style.setProperty('--lean', `${R(-1.15, 1.15).toFixed(2)}deg`);
+        glyph.style.setProperty('--rise', `${R(-1.1, 1.1).toFixed(2)}px`);
+        glyph.dataset.drawMs = String(Math.round(R(520, 690)));
+      }
+      nameDoodleText.append(glyph);
+      return glyph;
+    });
+
+    const withHeart = Math.random() < .48;
+    nameHeart.classList.remove('drawn');
+    if (withHeart) nameHeart.removeAttribute('hidden');
+    else nameHeart.setAttribute('hidden', '');
+    nameDoodle.className = `mname-doodle${withHeart ? ' has-heart' : ''} measuring`;
+    nameDoodle.hidden = false;
+
+    const w = nameDoodle.offsetWidth, h = nameDoodle.offsetHeight, spot = freeDoodleSpot(w, h);
+    if (!spot) { nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle'; return false; }
+    nameDoodle.style.left = '0'; nameDoodle.style.top = '0';
+    nameDoodle.style.setProperty('--tilt', `${R(-1.6, 1.4).toFixed(2)}deg`);
+    nameDoodle.style.transform = `translate(${spot.x}px,${spot.y}px) rotate(var(--tilt))`;
+    nameDoodle.classList.remove('measuring');
+
+    const firstGlyph = glyphs.find((glyph) => !glyph.classList.contains('is-space')) || glyphs[0];
+    const firstRect = firstGlyph?.getBoundingClientRect();
+    if (!firstRect) { nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle'; return false; }
+    const firstTarget = { x: firstRect.left + firstRect.width / 2, y: firstRect.top + firstRect.height * .58 };
+    const stand = nearTo(firstTarget.x, firstTarget.y, spot.w + 18);
+    if (!stand) { nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle'; return false; }
+
+    let completed = false;
+    try {
+      await goTo(stand, g, true);
+      nameDoodle.classList.add('writing');
+      M.face = firstTarget.x >= M.x ? 1 : -1;
+      M.tgt = firstTarget; M.tilt = R(-2.2, 2.2); mood('curious', 4);
+      arms([-76, 27], [-88, 27]);
+      await wait(320, g);
+
+      // Reveal each printed glyph slowly while the chalk follows its individual stroke path.
+      for (const glyph of glyphs) {
+        if (glyph.classList.contains('is-space')) { await wait(180, g); continue; }
+        const r = glyph.getBoundingClientRect();
+        const duration = Number(glyph.dataset.drawMs) || 600;
+        glyph.style.setProperty('--draw-ms', `${duration}ms`);
+        glyph.classList.add('written');
+        const paths = autographStrokePaths(glyph.textContent, r);
+        const eachStroke = duration / Math.max(1, paths.length);
+        for (let p = 0; p < paths.length; p++) {
+          await moveChalkAlong(paths[p], eachStroke, g);
+          if (p < paths.length - 1) await wait(110, g); // lift the chalk between strokes
+        }
+        await wait(90, g);
+      }
+
+      // A small hand-drawn heart is an occasional finishing flourish.
+      if (withHeart) {
+        const heartPath = nameHeart.querySelector('path');
+        const heartRect = nameHeart.getBoundingClientRect();
+        const total = heartPath.getTotalLength(), points = [];
+        for (let i = 0; i <= 16; i++) {
+          const q = heartPath.getPointAtLength(total * i / 16);
+          points.push({ x: heartRect.left + q.x / 72 * heartRect.width, y: heartRect.top + q.y / 56 * heartRect.height });
+        }
+        nameHeart.classList.add('drawn');
+        await moveChalkAlong(points, 2100, g);
+      }
+
+      chalkAim = null; chalk.classList.remove('on'); arms(...REST);
+      M.tgt = null; M.tilt = 0; mood('happy', 1.8);
+      completed = true;
+      doodleSeenEver = true; doodleVisited = true;
+      markStored('local', DOODLE_KEY); markStored('session', DOODLE_VISIT);
+
+      // Leave the finished autograph on the desk for a full minute, then let it fade slowly.
+      clearTimeout(doodleFadeTimer); clearTimeout(doodleHideTimer);
+      doodleFadeTimer = window.setTimeout(() => {
+        if (!alive || nameDoodle.hidden) return;
+        nameDoodle.classList.add('fading');
+        doodleHideTimer = window.setTimeout(() => {
+          if (!alive) return;
+          nameDoodle.hidden = true;
+          nameDoodle.className = 'mname-doodle';
+          nameDoodle.style.transform = '';
+          doodleHideTimer = 0;
+        }, 18000);
+        doodleFadeTimer = 0;
+      }, 60000);
+    } finally {
+      chalkAim = null; chalk.classList.remove('on'); M.tgt = null;
+      M.tilt = 0; arms(...REST);
+      if (!completed) {
+        nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle';
+        nameDoodle.style.transform = '';
+      }
+      mood('happy', 1.2);
+    }
+    return completed;
+  }
+
   async function prank(g) {
     const kinds = ['stop', 'vol', 'vol', 'trim', 'skip']; if (S.arm.mode === 'down') kinds.push('lever', 'lever');
     const kind = pick(kinds), el = $({ stop: '#power', lever: '#lever', vol: '#volume', trim: '#trim', skip: '#nextBtn' }[kind]); if (!el) return;
@@ -430,7 +721,9 @@ export function initMascot(S, audio, api) {
     for (let i = 0, n = 1 + ((R(0, 2)) | 0); i < n; i++) await antic(g);
   }
   async function run(a, g) {
-    if (a.k === 'wake') { mood('surprised', 1); await say(L('wake'), 'say', g); return; }
+    if (a.k === 'nameSaved') { mood('happy', 2.5); await say(`nice to meet you, ${visitorName}!`, 'say', g, 900); offer(); return; }
+    if (a.k === 'nameLater') { mood('happy', 1.5); await say('no pressure. i’ll call you friend for now.', 'say', g, 900); offer(); return; }
+    if (a.k === 'wake') { mood('surprised', 1); await say(addressVisitor(L('wake')), 'say', g); return; }
     if (a.k === 'move') return goTo(a, g, true);
     if (a.k === 'tour') return tour(g);
     if (a.k === 'ride') return ride(g);
@@ -439,15 +732,15 @@ export function initMascot(S, audio, api) {
     if (a.k === 'shove') return shove(g);
     if (a.k === 'tantrum') return tantrum(g);
     if (a.k === 'annoyed') return annoyed(g);
-    if (a.k === 'later') { mood('happy', 1.5); return say('okay! i’m here if you need me.', 'say', g, 1000); }
+    if (a.k === 'later') { mood('happy', 1.5); return say(visitorName ? `okay, ${visitorName}. i’m here if you need me.` : 'okay! i’m here if you need me.', 'say', g, 1000); }
     if (a.k === 'tap') {
       const n = tapN++; M.sit = 0;
       if (!a.hard && speechUntil - performance.now() > 900) { M.glad = 1; M.sq = .45; arms([-60, 28], [-60, 28]); mood('surprised', .5); await wait(500, g); return; }     // mid-sentence: a little jump, no new bubble
       M.glad = 1;
       if (a.hard) { M.sq = .7; mood('sad', 1.4); arms([-60, 28], [-60, 28]); await say(L('hurt'), 'shout', g, 1000, true); }
       else if (n % 4 === 1 && !playing && !reduce) { M.micT = 1; M.hold = 1; mood('happy', 2); arms(null, [138, 30]); notes(); await say(L('mic'), 'think', g, 1400); M.hold = 0; M.micT = 0; }
-      else { if (n % 3 === 0 && !reduce) M.sp = 1; mood('happy', 1.6); arms([-60, 28], [-60, 28]); await say(L('tap'), 'say', g); }
-    } else if (a.k === 'track') { if (playing && !reduce) { arms([-70, 28], [-70, 28]); M.sp = 1; } mood('excited', 2); await say(L('track', a.title), 'say', g, 1200); }
+      else { if (n % 3 === 0 && !reduce) M.sp = 1; mood('happy', 1.6); arms([-60, 28], [-60, 28]); await say(addressVisitor(L('tap')), 'say', g); }
+    } else if (a.k === 'track') { if (playing && !reduce) { arms([-70, 28], [-70, 28]); M.sp = 1; } mood('excited', 2); await say(addressVisitor(L('track', a.title)), 'say', g, 1200); }
     else if (a.k === 'end') { mood('sad', 1.8); await say(L('end'), 'say', g); }
     else if (a.k === 'land') {
       arms([-50, 26], [-50, 26]);
@@ -455,21 +748,37 @@ export function initMascot(S, audio, api) {
       else if (a.v < 520) { mood('happy', 2); if (!reduce) M.sp = 1; await say(pick(['wheee! again!', 'soft landing. 10/10.', 'ha! i bounced.']), 'say', g, 1000, true); }
       else { mood('surprised', 1.2); await say(a.n && LINES['hit_' + a.n] ? L('hit_' + a.n) : L('land'), 'say', g, 1000, true); }
     }
-    else if (a.k === 'poke') { const s = nearTo(a.x, a.y, 0); if (s && Math.hypot(s.x - a.x, s.y - BH * .5 - a.y) < 110) { await goTo(s, g, true); M.face = a.x >= M.x ? 1 : -1; reach(a.x, a.y, 50); M.tgt = { x: a.x, y: a.y }; mood('curious', 2); await say(L('touch'), 'say', g, 1000); } else { M.tgt = { x: a.x, y: a.y }; mood('curious', 1.6); await wait(1600, g); } }     // too far to reach: just look at it
+    else if (a.k === 'poke') { const s = nearTo(a.x, a.y, 0); if (s && Math.hypot(s.x - a.x, s.y - BH * .5 - a.y) < 110) { await goTo(s, g, true); M.face = a.x >= M.x ? 1 : -1; reach(a.x, a.y, 50); M.tgt = { x: a.x, y: a.y }; mood('curious', 2); await say(addressVisitor(L('touch')), 'say', g, 1000); } else { M.tgt = { x: a.x, y: a.y }; mood('curious', 1.6); await wait(1600, g); } }     // too far to reach: just look at it
   }
   async function decide(g) {
     while (M.mode !== 'walk') await wait(140, g);
     const now = performance.now(); lastTick = now; if (!playing && !M.hold) M.micT = 0; arms(...REST); M.tgt = null; M.dance = 0; M.sway = 0; M.fing = 0; M.tilt = 0; M.nod = 0; M.shake = 0;
+    if (!namePanel.hidden) { await wait(450, g); return; }
     if (queue.length) return run(queue.shift(), g);
-    if (!welcomed) { welcomed = true; mood('happy', 3); arms(null, [-62, 30]); await say(L('hi'), 'say', g, 1000); offer(); return; }
+    if (!welcomed) {
+      welcomed = true; mood('happy', 3); arms(null, [-62, 30]);
+      await say(visitorName ? `hey, ${visitorName}! good to see you again.` : L('hi'), 'say', g, 1000);
+      if (!visitorName && !nameSkipped) { openNamePanel(); return; }
+      offer(); return;
+    }
     if (chipExp && !chip.hidden) { await wait(500, g); return; }
     const quiet = now - idleAt;
+    if (!torchVisited && !torchInProgress && torchTries < 3 && now > torchBackoff && now - born > 22000 && quiet > 9000 && !tourOn && !pr && !raging && !curious && !op && !drag && !M.petting && !M.sleep) {
+      torchRolls++;
+      if ((!torchSeenEver && torchRolls >= 4) || Math.random() < (torchSeenEver ? .045 : .16)) {
+        if (await torchEaster(g)) return;             // if it could not run, carry on with normal life instead of retrying
+      }
+    }
+    if (visitorName && !doodleVisited && now - born > 26000 && quiet > 7500 && !tourOn && !pr && !raging && !curious && !op && !drag && !M.petting && !M.sleep && !chalkAim && !torchAim) {
+      doodleRolls++;
+      if ((!doodleSeenEver && doodleRolls >= 4) || Math.random() < (doodleSeenEver ? .13 : .2)) return writeNameDoodle(g);
+    }
     if (!playing && quiet > 30000) { mood('sleepy', 6); M.ot = 1; M.wt = .3; M.nod = 1; await wait(1500, g); M.ot = 0; await wait(1300, g); M.nod = 0; M.sleep = 1; show('zZz…', 'sleepy'); return wait(6e5, g); }        // yawns, nods off, then sleeps until touched
     if (!reduce && now > prankAt && quiet > 3500 && (playing || quiet < 26000) && now - born > 18000 && !M.petting) { prankAt = now + R(22000, 48000); return playing ? prank(g) : Math.random() < .5 && !S.motor && S.arm.mode === 'parked' ? inspect(g) : ride(g); }
     if (playing) return perform(g);
     return wander(g);
   }
-  async function loop() { while (alive) { const g = ++gen; try { await decide(g); } catch (e) { if (e !== 'x') console.warn(e); hide(); btn.classList.remove('mad'); M.dance = 0; M.sway = 0; M.fing = 0; M.grip = null; M.eff = 0; M.tilt = 0; M.nod = 0; M.shake = 0; speechUntil = Math.min(speechUntil, performance.now() + 300); await new Promise((r) => setTimeout(r, 80)); } } }
+  async function loop() { while (alive) { const g = ++gen, t0 = performance.now(); try { await decide(g); } catch (e) { if (e !== 'x') console.warn(e); hide(); btn.classList.remove('mad'); M.dance = 0; M.sway = 0; M.fing = 0; M.grip = null; M.eff = 0; M.tilt = 0; M.nod = 0; M.shake = 0; speechUntil = Math.min(speechUntil, performance.now() + 300); await new Promise((r) => setTimeout(r, 80)); } if (performance.now() - t0 < 6) await new Promise((r) => setTimeout(r, 50)); } }
 
   const MOODS = {
     calm: { cover: .05, tilt: 0, low: 0, smile: .4, brow: 0, bt: 0, pup: 1 }, happy: { cover: 0, tilt: 0, low: .45, smile: 1, brow: .3, bt: -3, pup: 1.08 },
@@ -513,6 +822,25 @@ export function initMascot(S, audio, api) {
     const sw = Math.sin(t * 1.7) * 2.5, A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
     A(M.L, E.al, E.hl, 12, 1, E.al2); const [hxr, hyr] = A(M.Rm, E.ar, E.hr, 88, -1, E.ar2);
     E.mc.setAttribute('transform', `translate(${hxr} ${hyr})rotate(-36)scale(${M.mic})`); E.mc.style.display = M.mic > .03 ? '' : 'none'; E.fg.style.display = M.fing ? '' : 'none'; if (M.fing) E.fg.setAttribute('transform', `translate(${hxr} ${hyr})`);
+    chalk.classList.toggle('on', !!chalkAim);
+    if (chalkAim) {
+      chalk.style.left = `${((hxr + 20) / 140) * 100}%`; chalk.style.top = `${((hyr + 14) / 140) * 100}%`;
+      const hand = E.hr.getBoundingClientRect(), hx = hand.left + hand.width / 2, hy = hand.top + hand.height / 2;
+      const dx = chalkAim.x - hx, dy = chalkAim.y - hy;
+      chalk.style.transform = `translate(-12%,-50%) rotate(${Math.atan2(dy, dx * M.face) * 180 / Math.PI}deg)`;
+    }
+    if (torchAim) {
+      const hand = E.hr.getBoundingClientRect(), hx = hand.left + hand.width / 2, hy = hand.top + hand.height / 2;
+      const dx = torchAim.x - hx, dy = torchAim.y - hy, len = Math.max(1, Math.hypot(dx, dy)), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      const ku = size / 72, bl = cl(len - 30 * ku, 24, 520);
+      rig.style.transform = `translate3d(${hx.toFixed(1)}px,${hy.toFixed(1)}px,0) rotate(${ang.toFixed(1)}deg)`;
+      rigProp.style.transform = `scale(${ku.toFixed(3)}) scaleY(${Math.abs(ang) > 90 ? -1 : 1})`;     // keep the torch right-side up when it points left
+      rigBeam.style.transform = `translateX(${(30 * ku).toFixed(1)}px) scale(${(bl / 420).toFixed(3)})`;
+      spot.style.transform = `translate3d(${torchAim.x.toFixed(1)}px,${torchAim.y.toFixed(1)}px,0)`;
+      rig.classList.add('on'); rig.classList.toggle('lit', torchLit); spot.classList.toggle('lit', torchLit);
+    } else if (rig.classList.contains('on') || spot.classList.contains('lit')) {
+      rig.classList.remove('on', 'lit'); spot.classList.remove('lit');
+    }
     E.an.setAttribute('transform', `rotate(${Math.sin(t * 3) * 5 + lv * 14 + (M.sleep ? 14 : 0)} 34 12)`); E.bu.setAttribute('opacity', M.sleep ? .15 : playing ? .35 + lv : .55 + Math.sin(t * 2) * .35);
     // body
     const walk = !!M.go, hop = walk ? Math.abs(Math.sin(M.ph)) * 5 : M.dance || M.run ? Math.abs(Math.sin(t * 9)) * (4 + 10 * (playing ? Math.max(.3, lv) : .7)) : 0, bob = hop + (playing ? lv * 3 : Math.sin(t * (M.sleep ? 1.2 : 2)) * (M.sleep ? 1.6 : .8)) + (M.sit && !walk ? 4 : 0) + (M.sleep ? 5 : 0), fx = Math.cos((1 - M.sp) * TAU);
@@ -558,7 +886,7 @@ export function initMascot(S, audio, api) {
   };
   on(btn, 'pointerup', (e) => drop(e, false)); on(btn, 'pointercancel', (e) => drop(e, true));
   on(btn, 'click', (e) => { if (e.detail === 0 && !tourOn) { queue.push({ k: 'tap' }); interrupt(); } });
-  on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,button,[role],a,#deckFit') || tourOn || reduce || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
+  on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,.mname,.mname-doodle,button,[role],a,#deckFit') || tourOn || reduce || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
   on(window, 'pointermove', (e) => { if (e.pointerType === 'mouse') { mx = e.clientX; my = e.clientY; } idleAt = performance.now(); if (M.sleep) activity(); });
   on(window, 'keydown', () => { activity(); if (curious) interrupt(); }); on(window, 'scroll', activity, { passive: true });
   let rt = 0; on(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { measure(); if (M.mode === 'walk' && !op && !raging && !curious && (hit(M.x, M.y, rects()) || !inV(M.x, M.y))) { const s = spots(rects()); if (s.length) { const p = pick(s); M.x = p.x; M.y = p.y; interrupt(); } } }, 160); });
@@ -568,6 +896,8 @@ export function initMascot(S, audio, api) {
     if (M.mode === 'held' && !drag) { M.mode = 'fall'; M.vx = M.vy = 0; }
     if (M.mode !== 'walk' && now - wSince > (M.mode === 'disc' ? 40000 : 15000)) { M.mode = 'fall'; M.dc = null; M.jp = null; M.vx = M.vy = 0; interrupt(); }
     if (M.go && now - M.go.t0 > 16000) interrupt();
+    if (torchInProgress && now - torchStartedAt > 22000) interrupt();
+    if (!torchInProgress && (torchAim || torchLit)) { torchAim = null; torchLit = false; $('.engrave')?.classList.remove('torch-lit'); }
     if (!op && M.grip) M.grip = null; if (!op && !raging && M.eff) M.eff = 0;
     if (!tourOn && !op && !ring.hidden && now - ringAt > 15000) ring.hidden = true;
     if (!drag && M.petting) M.petting = 0; if (!playing && M.micT && !M.hold && !tourOn) M.micT = 0;
@@ -578,5 +908,5 @@ export function initMascot(S, audio, api) {
   measure(); const sp = spots(rects()), home = sp.find((s) => s.kind === 'home'), s0 = (home && Math.random() < .5 ? home : pick(sp.filter((s) => s.kind !== 'home')) || home) || { x: innerWidth / 2, y: innerHeight - 12 };
   M.x = s0.x; M.y = s0.y; M.sit = s0.kind === 'edge' ? 1 : 0; btn.classList.add('on'); requestAnimationFrame(frame); setTimeout(loop, reduce ? 300 : 1100);
   if (location.search.includes('debug')) window.__static = { M, get pr() { return pr; }, setIdle: (ms) => { idleAt = performance.now() - ms; interrupt(); }, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, queue, interrupt, chip, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, hit, BW: () => BW, BH: () => BH };
-  return () => { mq.remove(); chip.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearInterval(watch); clearTimeout(ht); btn.remove(); bub.remove(); ring.remove(); };
+  return () => { mq.remove(); chip.remove(); namePanel.remove(); nameDoodle.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearInterval(watch); clearTimeout(ht); clearTimeout(doodleFadeTimer); clearTimeout(doodleHideTimer); btn.remove(); bub.remove(); ring.remove(); rig.remove(); spot.remove(); $('.engrave')?.classList.remove('torch-lit'); };
 }

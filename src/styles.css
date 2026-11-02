@@ -3,6 +3,7 @@
 @font-face{font-family:"Lora";src:url(/fonts/lora.woff) format("woff");font-weight:400 700;font-style:normal;font-display:swap}
 @font-face{font-family:"Lora";src:url(/fonts/lora-italic.woff) format("woff");font-weight:400 700;font-style:italic;font-display:swap}
 @font-face{font-family:"Engrave";src:url(/fonts/engrave.woff) format("woff");font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:"JustAnotherHand";src:url(/fonts/just-another-hand.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
 
 :root{
   --desk:#121110;
@@ -103,8 +104,8 @@ a{color:inherit}
 }
 .engrave{
   z-index:2;left:calc(68 * var(--k));top:calc(806 * var(--k));margin:0;
-  font-family:"Engrave","Lora",sans-serif;font-weight:300;font-size:calc(27 * var(--k));line-height:1;letter-spacing:.16em;
-  color:#160a04;text-shadow:0 calc(1 * var(--k)) 0 rgba(255,222,190,.22);
+  font-family:"Engrave","Lora",sans-serif;font-weight:300;font-size:calc(29.5 * var(--k));line-height:1;letter-spacing:.16em;
+  color:#24160d;text-shadow:0 calc(1 * var(--k)) 0 rgba(255,222,190,.26);
 }
 
 /* platter */
@@ -371,7 +372,71 @@ a{color:inherit}
 .mbub.shout .mtx{font:800 13px/1.2 ui-rounded,"Trebuchet MS",system-ui,sans-serif;font-style:normal;color:#7a1810;animation:mshake .13s infinite}
 .mchip{position:fixed;left:0;top:0;z-index:42;display:flex;align-items:center;gap:6px;padding:5px 6px 5px 12px;border-radius:999px;background:#f4ecd9;border:2px solid #1d140e;box-shadow:0 3px 0 rgba(0,0,0,.35);font:italic 600 12.5px Lora,Georgia,serif;color:#2a1b12;animation:mpop .22s cubic-bezier(.3,1.6,.5,1)}
 .mchip[hidden]{display:none}
+.mchip.docked{
+  left:max(12px,calc(env(safe-area-inset-left,0px) + 12px));
+  top:max(12px,calc(env(safe-area-inset-top,0px) + 12px));
+  transform:none!important;
+  z-index:100;
+}
 .mchip button{font:700 12px system-ui,sans-serif;border:0;border-radius:999px;padding:6px 12px;min-height:32px;cursor:pointer;background:#d9b47a;color:#1d140e}.mchip button+button{background:transparent;color:#6b5a48}
+
+/* Visitor nickname prompt — warm paper, walnut and brass from the turntable. */
+.mname{position:fixed;left:0;top:0;z-index:46;display:flex;flex-direction:column;gap:8px;width:min(252px,calc(100vw - 28px));padding:12px;border:1px solid rgba(72,48,27,.26);border-radius:17px;background:linear-gradient(145deg,#fff9e9,#eee0c2);box-shadow:0 9px 26px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.8);color:#2a1b12;font-family:"Lora",Georgia,serif}
+.mname[hidden]{display:none}
+.mname__ask{font-size:13px;font-style:italic;letter-spacing:.01em}
+.mname__input{box-sizing:border-box;width:100%;min-width:0;height:37px;padding:0 10px;border:1px solid rgba(83,59,35,.28);border-radius:9px;outline:none;background:rgba(255,255,255,.56);color:#26190f;font:500 14px "Lora",Georgia,serif}
+.mname__input::placeholder{color:#97866e}
+.mname__privacy{font:10px/1.2 system-ui,sans-serif;color:#88775e;letter-spacing:.02em}
+.mname__input:focus{border-color:#b58d55;box-shadow:0 0 0 2px rgba(181,141,85,.16)}
+.mname__actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.mname__actions button{min-height:32px;padding:5px 13px;border:0;border-radius:999px;font:600 12px system-ui,sans-serif}
+.mname__save{background:#d9b47a;color:#21170f;box-shadow:inset 0 1px 0 rgba(255,255,255,.42)}
+.mname__later{background:transparent;color:#77654e}
+.mname__actions button:focus-visible{outline:2px solid #8b673d;outline-offset:2px}
+
+/* Temporary chalk handwriting in a genuinely empty patch of the desk. */
+.mname-doodle{position:fixed;left:0;top:0;z-index:36;display:flex;align-items:baseline;gap:5px;max-width:calc(100vw - 24px);pointer-events:none;opacity:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.78));transform-origin:center}
+.mname-doodle[hidden]{display:none}
+.mname-doodle.measuring{visibility:hidden}
+.mname-doodle__text{display:inline-flex;align-items:baseline;max-width:calc(100vw - 78px);padding:12px 6px 25px;overflow:visible;white-space:pre;color:rgba(244,238,221,.96);font:400 clamp(28px,7.2vw,52px)/1.38 "JustAnotherHand","Segoe Print",cursive;letter-spacing:.012em;-webkit-text-stroke:.22px rgba(255,250,230,.3);text-shadow:0 0 1px rgba(255,248,225,.75),0 0 7px rgba(239,230,203,.2),1px 2px 2px rgba(0,0,0,.96)}
+.mname-glyph{position:relative;display:inline-block;flex:none;line-height:1.38;padding:5px 1px 22px;overflow:visible;opacity:0;clip-path:inset(0 100% 0 0);transform:translateY(2px) rotate(var(--lean,0deg));transform-origin:bottom left}
+.mname-glyph.written{animation:mnameGlyphWrite var(--draw-ms,600ms) cubic-bezier(.2,.7,.22,1) forwards}
+.mname-glyph.is-space{width:.34em;opacity:1;clip-path:none;animation:none;padding:0}
+@keyframes mnameGlyphWrite{0%{opacity:0;clip-path:inset(0 100% 0 0);filter:blur(.45px);transform:translateY(3px) rotate(var(--lean,0deg)) scaleX(.94)}42%{opacity:1;filter:blur(.12px)}100%{opacity:1;clip-path:inset(0 0 0 0);filter:none;transform:translateY(var(--rise,0px)) rotate(var(--lean,0deg)) scaleX(1)}}
+.mname-doodle__heart{display:block;flex:none;width:37px;height:30px;overflow:visible;color:rgba(244,238,221,.94);filter:drop-shadow(0 0 3px rgba(239,226,194,.36))}
+.mname-doodle__heart[hidden]{display:none}
+.mname-doodle__heart path{fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:190;stroke-dashoffset:190}
+.mname-doodle__heart.drawn path{animation:mnameHeartDraw 2.1s cubic-bezier(.3,.65,.2,1) forwards}
+.mname-doodle.writing{opacity:1}
+.mname-doodle.fading{animation:mnameSlowFade 18s ease-in forwards}
+@keyframes mnameHeartDraw{to{stroke-dashoffset:0}}
+@keyframes mnameSlowFade{from{opacity:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.78))}to{opacity:0;filter:drop-shadow(0 0 0 transparent)}}
+.mchalk{position:absolute;z-index:3;left:50%;top:50%;width:17px;height:5px;border-radius:2px;background:linear-gradient(180deg,#fffdf0,#d9d0bc 56%,#958b74);box-shadow:0 0 5px rgba(255,245,214,.58),0 1px 2px rgba(0,0,0,.75);opacity:0;pointer-events:none;transform-origin:12% 50%;transition:opacity .14s ease}
+.mchalk.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.mname-glyph.written,.mname-doodle__heart.drawn path,.mname-doodle.fading{animation-duration:.01ms;animation-delay:0s}}
+
+
+/* A rare flashlight visit for the tiny engraved signature.
+   One rig sits on the hand and is rotated toward the target; torch and beam share that frame. Only transform/opacity animate. */
+.mtl,.mtl-spot{position:fixed;left:0;top:0;pointer-events:none;opacity:0;transition:opacity .2s ease;will-change:transform,opacity}
+.mtl{z-index:43;width:0;height:0}
+.mtl.on{opacity:1}
+.mtl__prop{position:absolute;left:-10px;top:-6px;width:42px;height:12px;transform-origin:10px 6px}
+.mtl__prop i{position:absolute;display:block}
+.mtl__grip{left:0;top:1.5px;width:27px;height:9px;border-radius:3px 1px 1px 3px;border:1px solid rgba(255,232,190,.28);background:repeating-linear-gradient(90deg,rgba(0,0,0,.28) 0 1px,transparent 1px 4px),linear-gradient(180deg,#8a7656 0%,#4b3d29 46%,#211a11 100%);box-shadow:0 1px 2px rgba(0,0,0,.7)}
+.mtl__head{left:26px;top:0;width:12px;height:12px;clip-path:polygon(0 18%,100% 0,100% 100%,0 82%);background:linear-gradient(180deg,#d8c79d 0%,#8f7b55 50%,#3c2f1f 100%)}
+.mtl__lens{left:35px;top:.5px;width:5px;height:11px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#cdbf93 0%,#7b6a47 70%,#2b2115 100%);transition:background .2s ease,box-shadow .2s ease}
+.mtl.lit .mtl__lens{background:radial-gradient(circle at 40% 45%,#fffdf0 0%,#ffeeb8 55%,#f0c878 100%);box-shadow:0 0 5px 2px rgba(255,226,150,.85)}
+.mtl__fist{left:5px;top:1px;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#a28d78,#33291f);border:1px solid #c9a56a}
+.mtl__beam{position:absolute;left:0;top:-60px;width:420px;height:120px;transform-origin:0 50%;opacity:0;transition:opacity .2s ease;
+  clip-path:polygon(0 47%,100% 0,100% 100%,0 53%);
+  -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 32%,#000 68%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0%,#000 32%,#000 68%,transparent 100%);
+  background:linear-gradient(90deg,rgba(255,238,196,.46) 0%,rgba(255,228,170,.24) 55%,rgba(255,218,150,.15) 100%)}
+.mtl.lit .mtl__beam{opacity:1;animation:mtlIgnite .5s linear both}
+.mtl-spot{z-index:44;width:150px;height:64px;margin:-32px 0 0 -75px;border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,226,158,.5) 0%,rgba(255,206,124,.22) 36%,rgba(255,196,110,.06) 56%,transparent 72%)}
+.mtl-spot.lit{opacity:1;animation:mtlIgnite .5s linear both}
+@keyframes mtlIgnite{0%{opacity:0}14%{opacity:1}26%{opacity:.2}40%{opacity:1}52%{opacity:.55}68%,100%{opacity:1}}
+.engrave.torch-lit{color:#c79d66;text-shadow:0 0 2px rgba(255,236,186,.9),0 0 8px rgba(255,214,140,.65),0 0 16px rgba(255,190,105,.3);transition:color .25s ease,text-shadow .25s ease}
 @keyframes mshake{50%{transform:translate(1px,-1px) rotate(.6deg)}}
 
 /* Static v3: lifted record, ? badge, mood bubbles, tap-to-dismiss */
