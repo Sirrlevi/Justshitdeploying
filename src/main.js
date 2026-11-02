@@ -169,6 +169,7 @@ function autoCue() { setMotor(true); cueTo(S.rec.index, S.rec.pos); }
 function skipTo(i) {
   const n = S.tracks.length;
   if (!n) return;
+  S.userSkipAt = performance.now();        // the mascot reads this: a skip by the visitor is not the record ending by itself
   setMotor(true);
   cueTo((i + n) % n, 0);
 }

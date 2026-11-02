@@ -31,6 +31,10 @@ const LINES = {
   rage: ['#@$%&!! WHO DID THAT?!', 'I’LL BREAK THIS WHOLE %$#@ DECK!', 'ARGH!! *!@#$%^&*', 'you %@#$! you stupid &*$#!', 'GRRRR. @#$%!!', 'I. AM. NOT. A. DRUM!! $#@%'],
   calm: ['…okay. i’m calm. i’m calm.', 'sorry. i lost it. that was a lot.', 'deep breath. in… out… phew.', 'we don’t speak of that. 🙈'],
   annoyed: ['OI! i was VIBING, you %$#@!', 'who stopped it?! @#$%!!', 'rude. RUDE. $%@#!!', 'my song! my stage! you #$%@!'],
+  annoyedSkip: ['OI! who changed my song?! @#$%!!', 'i was VIBING to that, you %$#@!', 'skip?! SKIP?! %@#$!!', 'rude! that was MY track! $%@#!'],
+  smugSkip: ['fine. but this is MY song now.', 'hmph. ask me before skipping next time.', 'okay okay. i’ll sing this one. don’t touch.', 'skip it again and see what happens. 😤'],
+  tired: ['phew… need a breather.', '*pant pant* intermission.', 'give me a sec, i’m dancing hard here.', 'okay okay, tiny break. the song goes on.'],
+  recharged: ['okay!! recharged. WATCH THIS.', 'and we’re BACK!!', 'battery full. let’s gooo!', 'intermission over. encore time!'],
   smug: ['told you. my song, my rules.', 'back on. don’t touch it again.', 'try me. i dare you. 😤', 'there. fixed. you’re welcome.'],
   chat: ['i wonder what’s in that mug…', 'that plant is judging me.', 'do headphones dream?', 'someone should dust this desk.', 'i could do this all day.', 'psst, try dragging me.', 'pro tip: fling me. i dare you.', 'i have 0 chill and 3 moods.'],
   track: ['ooh. {t}.', '{t}? good taste.', 'oh this one. {t}!', '{t} hits different.', 'new track: {t}. vibe check.'],
@@ -102,7 +106,7 @@ export function initMascot(S, audio, api) {
   const pps = btn.querySelectorAll('.pp'), bsvg = bub.querySelector('svg'), tt = bub.querySelector('b'), gg = bub.querySelector('i');
   const lids = [...btn.querySelectorAll('.lid')], los = [...btn.querySelectorAll('.lo')];
   let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, noteT = 0, told = new Set(), queue = [], lastIdx = S.rec.index, needleT = 0, tapN = 0, welcomed = false, tourT = performance.now() + 9000, mx = -1, my = -1;
-  const M = { mood: { n: 'calm', t: 0 }, shake: 0, tilt: 0, nod: 0, mad: 0, pet: 0, petting: 0, eff: 0, grip: null, fing: 0, mon: 0, mode: 'walk', vx: 0, vy: 0, vr: 0, rot: 0, sq: 0, peak: 0, dizzy: 0, wide: 0, hx: 0, hy: 0, jp: null, dc: null, dance: 0, struggle: 0, sway: 0, run: 0, x: 0, y: 0, face: 1, pop: 0, ph: 0, mic: 0, micT: 0, o: 0, ot: 0, w: .5, wt: .5, lx: 0, ly: 0, nb: 2, bl: 0, sleep: 0, sit: 0, sp: 0, glad: 0, go: null, tgt: null, hold: 0,
+  const M = { mood: { n: 'calm', t: 0 }, shake: 0, tilt: 0, nod: 0, mad: 0, pet: 0, petting: 0, eff: 0, grip: null, fing: 0, mon: 0, mode: 'walk', vx: 0, vy: 0, vr: 0, rot: 0, sq: 0, peak: 0, dizzy: 0, wide: 0, hx: 0, hy: 0, jp: null, dc: null, dance: 0, struggle: 0, sway: 0, run: 0, x: 0, y: 0, face: 1, pop: 0, ph: 0, mic: 0, micT: 0, o: 0, ot: 0, w: .5, wt: .5, lx: 0, ly: 0, nb: 2, bl: 0, sleep: 0, sit: 0, rest: 0, sp: 0, glad: 0, go: null, tgt: null, hold: 0,
     L: { a: 102, l: 22, ta: 102, tl: 22 }, Rm: { a: 78, l: 22, ta: 78, tl: 22 } };
   const REST = [[102, 22], [78, 22]], arms = (l, r) => { if (l) [M.L.ta, M.L.tl] = l; if (r) [M.Rm.ta, M.Rm.tl] = r; };
   const pend = new Set();
@@ -200,20 +204,55 @@ export function initMascot(S, audio, api) {
   };
   const hearts = () => { if (reduce) return; const e = Object.assign(document.createElement('span'), { className: 'mn mh', textContent: '♥' }), r = btn.getBoundingClientRect(); e.style.cssText = `left:${r.left + R(r.width * .2, r.width * .8)}px;top:${r.top + 4}px;--dx:${R(-18, 18)}px;--r:${R(-20, 20)}deg`; document.body.append(e); e.onanimationend = () => e.remove(); };
   const DANCES = [1, 2, 3, 5, 6, 7, 8, 9], MIC_ARM = [104, 33];   // arm patterns live in danceArms(); MIC_ARM holds the mic up beside the mouth
+  async function rest(g) {      // a proper breather: walks off, sits, pants, does something calm (no mic, no lip-sync), then bursts back at full energy
+    restDue = performance.now() + R(55000, 85000);
+    try {
+      M.dance = 0; M.micT = 0; M.sway = 0; M.rest = 1; mood('sad', 2.2); arms([60, 26], [120, 26]);
+      const sp = spots(rects()), edges = sp.filter((q) => q.kind === 'edge'), spot = pick(edges.length ? edges : sp);
+      if (spot && !reduce) await goTo(spot, g, true);
+      M.sit = spot && spot.kind === 'edge' ? 1 : 0; M.tilt = 6; M.rest = 1; arms([60, 26], [120, 26]);
+      await say(L('tired'), 'sleepy', g, 500);
+      const endAt = performance.now() + R(5500, 8500), v = pick(['fan', 'sip', 'listen', 'stretch']);
+      if (v === 'fan') { for (let i = 0; i < 40 && playing && performance.now() < endAt; i++) { arms(null, [-125 + (i % 2) * 30, 30]); await wait(220, g); } }
+      else if (v === 'sip') {
+        M.rest = 3; M.ot = .05; M.wt = .5; arms(null, [-120, 26]); await say('🥤 glug glug glug…', 'think', g, 1300);
+        M.rest = 1; arms(null, [102, 22]); mood('happy', 1.6); await say('ahh. that hit the spot.', 'say', g, 700);
+      }
+      else if (v === 'listen') {
+        M.rest = 3; M.ot = .05; M.wt = .5; M.nod = 1; mood('happy', 3); arms([60, 26], [112, 26]);
+        for (let i = 0; i < 40 && playing && performance.now() < endAt; i++) { if (i % 3 === 0) notes(); await wait(700, g); }
+      }
+      else {
+        M.rest = 3; M.tilt = 0; mood('sleepy', 3); arms([-70, 30], [-110, 30]); M.ot = 1; M.wt = .3; await wait(1500, g);
+        M.ot = .05; arms([-20, 30], [-150, 30]); M.tilt = -8; await wait(1100, g); M.tilt = 8; arms([-150, 30], [-20, 30]); await wait(1100, g);
+      }
+      M.rest = 0; M.sit = 0; M.nod = 0; M.tilt = 0; M.glad = 1; mood('excited', 2.6); arms([-115, 32], [-65, 32]); if (!reduce) { M.sp = 1; await hop(M.x, M.y, g, 480, 100); }
+      await say(addressVisitor(L('recharged')), 'shout', g, 600); M.dance = pick(DANCES); await wait(900, g);
+    } finally { M.rest = 0; M.sit = 0; M.nod = 0; M.tilt = 0; M.dance = 0; arms(...REST); }
+  }
   async function perform(g) {
     M.micT = 0; let last = '', still = 0;
+    const bout = performance.now() + R(22000, 38000);     // a bout of full energy, then hand control back to decide(): pranks, easter eggs and rests all live there
+    let anchor = { x: M.x, y: M.y, t: performance.now() };
     const MOVERS = ['strut', 'micWalk', 'jump', 'micJump', 'strut', 'micWalk'], STILLS = ['dance', 'micDance', 'bang', 'spin', 'micSway', 'emote'];
     const calm = () => { M.dance = 0; M.micT = 0; M.sway = 0; arms(...REST); };
     const hopSide = async (range, ms, ah) => { const x = cl(M.x + R(-range, range), BW + 8, innerWidth - BW - 8); await hop(hit(x, M.y, rects()) ? M.x : x, M.y, g, ms, ah); };
-    while (playing) {
-      let mv; for (let n = 0; n < 6; n++) { mv = reduce ? pick(['micSway', 'dance', 'emote']) : (still >= 1 || Math.random() < .55) ? pick(MOVERS) : pick(STILLS); if (mv !== last) break; }
-      still = MOVERS.includes(mv) ? 0 : still + 1; last = mv;     // never two still moves in a row, never the same move twice
+    while (playing && performance.now() < bout) {
+      let mv; for (let n = 0; n < 6; n++) { mv = reduce ? pick(['micSway', 'dance', 'emote']) : (still >= 1 || Math.random() < .7) ? pick(MOVERS) : pick(STILLS); if (mv !== last) break; }
+      still = MOVERS.includes(mv) ? 0 : still + 1; last = mv;
+      const nowT = performance.now(); if (Math.hypot(M.x - anchor.x, M.y - anchor.y) > 60) anchor = { x: M.x, y: M.y, t: nowT };
+      else if (!reduce && nowT - anchor.t > 6000) { mv = 'travel'; still = 0; }       // anti-stuck: never stand on one spot for more than ~6s while performing     // never two still moves in a row, never the same move twice
       mood(pick(['happy', 'excited', 'happy']), 2.4);
       try {
-        if (mv === 'strut' || mv === 'micWalk') {
+        if (mv === 'travel') {
+          M.micT = Math.random() < .5 ? 1 : 0; M.dance = pick(DANCES); mood('excited', 2);
+          const far = spots(rects()).filter((q) => Math.hypot(q.x - M.x, q.y - M.y) > 170);
+          if (far.length) await goTo(pick(far), g, true); else await hopSide(220, 700, 90);
+          anchor = { x: M.x, y: M.y, t: performance.now() };
+        } else if (mv === 'strut' || mv === 'micWalk') {
           if (mv === 'micWalk') M.micT = 1;
           M.dance = mv === 'strut' || Math.random() < .6 ? pick(DANCES) : 0;
-          const sp = spots(rects()); if (sp.length) await goTo(pick(sp), g, true); else await wait(1500, g);
+          const sp = spots(rects()), far = sp.filter((q) => Math.hypot(q.x - M.x, q.y - M.y) > 120); if (sp.length) await goTo(pick(far.length ? far : sp), g, true); else await wait(1500, g);
         } else if (mv === 'jump' || mv === 'micJump') {
           if (mv === 'micJump') M.micT = 1;
           for (let i = 0; i < 3 && playing; i++) { arms([-115, 32], [-65, 32]); if (i === 1 && !reduce) M.sp = 1; await hopSide(110, 520, R(55, 115)); await wait(60, g); }
@@ -292,7 +331,7 @@ export function initMascot(S, audio, api) {
     gs = { s: 'new', asked: gs.asked + 1 }; gset(gs);
     setChip('new here? want a quick tour?', [['yes!', () => { gs = { s: 'accepted', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'tour' }); interrupt(); }], ['no thanks', () => { gs = { s: 'declined', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'later' }); interrupt(); }]], 16000);
   };
-  let fingAt = 0, ringAt = 0, lastTick = performance.now(), wLast = 'walk', wSince = performance.now(), raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
+  let songSince = 0, skipHandled = false, restDue = performance.now() + 55000, nextDoodleAt = performance.now() + 22000, fingAt = 0, ringAt = 0, lastTick = performance.now(), wLast = 'walk', wSince = performance.now(), raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
   const ease = (p) => p * p * (3 - 2 * p), lerp = (a, b, p) => a + (b - a) * p;
   function hands2(a, b) {                       // both hands onto two screen points (stretchy cartoon arms)
     const u = size / 140, hs = [a, b].map((p) => [50 + ((p.x - M.x) / u) * M.face, 118 + (p.y - M.y) / u]).sort((p, q) => p[0] - q[0]), A2 = ([sx, sy], px) => [(Math.atan2(sy - 68, sx - px) * 180) / Math.PI, Math.hypot(sx - px, sy - 68)];
@@ -642,12 +681,12 @@ export function initMascot(S, audio, api) {
     } finally { raging = false; pr = false; if (was) { if (!S.motor || S.arm.mode !== 'down') api.autoCue(); } else { if (S.arm.mode === 'down') api.park(); if (S.motor) api.setMotor(false); } M.mad = Math.min(M.mad, .7); }
     await say(L('calm'), 'say', g, 1800);
   }
-  async function annoyed(g) {      // the visitor stopped the song while it was vibing: swears, flips them off, puts the song back on itself
+  async function annoyed(g, skip) {      // the visitor stopped / skipped the song while it was vibing: swears, flips them off, (puts the song back on itself)
     annoy++; pr = true; M.mad = Math.max(M.mad, .9);
     try {
-      M.face = 1; M.fing = 1; fingAt = performance.now(); arms(null, [-78, 36]); await say(L('annoyed'), 'angry', g, 1700); M.fing = 0;
-      const pw = $('#power'); if (pw) await operate(pw, g, { rage: true, done: () => api.autoCue() });
-      M.face = 1; M.fing = 1; arms(null, [-78, 36]); await say(L('smug'), 'sly', g, 1500); M.fing = 0; M.dance = 1; await wait(1800, g);
+      M.face = 1; M.fing = 1; fingAt = performance.now(); mood('angry', 3); arms(null, [-78, 36]); await say(L(skip ? 'annoyedSkip' : 'annoyed'), 'angry', g, 1700); M.fing = 0;
+      if (!skip) { const pw = $('#power'); if (pw) await operate(pw, g, { rage: true, done: () => api.autoCue() }); }
+      M.face = 1; M.fing = 1; fingAt = performance.now(); arms(null, [-78, 36]); await say(L(skip ? 'smugSkip' : 'smug'), 'sly', g, 1500); M.fing = 0; M.dance = 1; await wait(1800, g);
     } finally { pr = false; M.fing = 0; M.dance = 0; }
     if (annoy >= 3) { annoy = 0; queue.push({ k: 'tantrum' }); }
   }
@@ -800,7 +839,7 @@ export function initMascot(S, audio, api) {
     if (a.k === 'inspect') return inspect(g);
     if (a.k === 'shove') return shove(g);
     if (a.k === 'tantrum') return tantrum(g);
-    if (a.k === 'annoyed') return annoyed(g);
+    if (a.k === 'annoyed') return annoyed(g, a.skip);
     if (a.k === 'later') { mood('happy', 1.5); return say(visitorName ? `okay, ${visitorName}. i’m here if you need me.` : 'okay! i’m here if you need me.', 'say', g, 1000); }
     if (a.k === 'tap') {
       const n = tapN++; M.sit = 0;
@@ -824,7 +863,7 @@ export function initMascot(S, audio, api) {
   }
   async function decide(g) {
     while (M.mode !== 'walk') await wait(140, g);
-    const now = performance.now(); lastTick = now; if (!M.hold) M.micT = 0; arms(...REST); M.tgt = null; M.dance = 0; M.sway = 0; M.fing = 0; M.tilt = 0; M.nod = 0; M.shake = 0;
+    const now = performance.now(); lastTick = now; if (!M.hold) M.micT = 0; arms(...REST); M.tgt = null; M.dance = 0; M.sway = 0; M.fing = 0; M.rest = 0; M.tilt = 0; M.nod = 0; M.shake = 0;
     if (!namePanel.hidden) { if (playing) return vibe(g); await wait(450, g); return; }
     if (queue.length) return run(queue.shift(), g);
     if (!welcomed) {
@@ -841,16 +880,20 @@ export function initMascot(S, audio, api) {
         if (await torchEaster(g)) return;             // if it could not run, carry on with normal life instead of retrying
       }
     }
-    if (visitorName && !doodleVisited && now - born > 26000 && quiet > 7500 && !tourOn && !pr && !raging && !curious && !op && !drag && !M.petting && !M.sleep && !chalkAim && !torchAim) {
-      doodleRolls++;
-      if ((!doodleSeenEver && doodleRolls >= 4) || Math.random() < (doodleSeenEver ? .13 : .2)) return writeNameDoodle(g);
+    if (visitorName && now > nextDoodleAt && now - born > 20000 && (playing || quiet > 2500) && !tourOn && !pr && !raging && !curious && !op && !drag && !M.petting && !M.sleep && !chalkAim && !torchAim && namePanel.hidden) {
+      nextDoodleAt = now + 15000;        // if something interrupts it, try again soon; if it can't find room, wait a bit
+      const done = await writeNameDoodle(g);
+      if (done) { doodleVisited = false; nextDoodleAt = performance.now() + R(180000, 300000); }     // signed it: sign again every few minutes
+      else nextDoodleAt = performance.now() + 20000;
+      return;
     }
     if (!playing && quiet > 30000) { mood('sleepy', 6); M.ot = 1; M.wt = .3; M.nod = 1; await wait(1500, g); M.ot = 0; await wait(1300, g); M.nod = 0; M.sleep = 1; show('zZz…', 'sleepy'); return wait(6e5, g); }        // yawns, nods off, then sleeps until touched
-    if (!reduce && now > prankAt && quiet > 3500 && (playing || quiet < 26000) && now - born > 18000 && !M.petting) { prankAt = now + R(22000, 48000); return playing ? prank(g) : Math.random() < .5 && !S.motor && S.arm.mode === 'parked' ? inspect(g) : ride(g); }
+    if (!reduce && now > prankAt && (playing || quiet > 3500) && (playing || quiet < 26000) && now - born > 18000 && !M.petting) { prankAt = now + R(22000, 48000); return playing ? prank(g) : Math.random() < .5 && !S.motor && S.arm.mode === 'parked' ? inspect(g) : ride(g); }
+    if (playing && now > restDue) return rest(g);
     if (playing) return perform(g);
     return wander(g);
   }
-  async function loop() { while (alive) { const g = ++gen, t0 = performance.now(); try { await decide(g); } catch (e) { if (e !== 'x') console.warn(e); hide(); btn.classList.remove('mad'); M.dance = 0; M.sway = 0; M.fing = 0; M.grip = null; M.eff = 0; M.tilt = 0; M.nod = 0; M.shake = 0; speechUntil = Math.min(speechUntil, performance.now() + 300); await new Promise((r) => setTimeout(r, 80)); } if (performance.now() - t0 < 6) await new Promise((r) => setTimeout(r, 50)); } }
+  async function loop() { while (alive) { const g = ++gen, t0 = performance.now(); try { await decide(g); } catch (e) { if (e !== 'x') console.warn(e); hide(); btn.classList.remove('mad'); M.dance = 0; M.sway = 0; M.fing = 0; M.rest = 0; M.grip = null; M.eff = 0; M.tilt = 0; M.nod = 0; M.shake = 0; speechUntil = Math.min(speechUntil, performance.now() + 300); await new Promise((r) => setTimeout(r, 80)); } if (performance.now() - t0 < 6) await new Promise((r) => setTimeout(r, 50)); } }
 
   const MOODS = {
     calm: { cover: .05, tilt: 0, low: 0, smile: .4, brow: 0, bt: 0, pup: 1 }, happy: { cover: 0, tilt: 0, low: .45, smile: 1, brow: .3, bt: -3, pup: 1.08 },
@@ -871,14 +914,26 @@ export function initMascot(S, audio, api) {
   function frame(now) {
     if (!alive) return; requestAnimationFrame(frame);
     const dt = Math.min(.05, (now - T0) / 1000 || .016), t = now / 1000, k = 1 - Math.pow(.001, dt); T0 = now;
-    const pl = !!(S.motor && S.arm.mode === 'down'); if (pl !== playing) { playing = pl; if (pl) singSince = performance.now(); if (!tourOn && !pr && !raging && M.mode === 'walk') { if (!pl) queue.push(singSince && performance.now() - singSince > 4000 && S.rec.pos > .6 ? { k: 'annoyed' } : { k: 'end' }); interrupt(); } }
-    if (S.rec.index !== lastIdx) { lastIdx = S.rec.index; if (S.motor && welcomed && !tourOn && !pr) { queue.push({ k: 'track', title: S.tracks[lastIdx]?.title || 'this one' }); interrupt(); } }
+    const pl = !!(S.motor && S.arm.mode === 'down');
+    if (pl !== playing) {
+      playing = pl; if (pl) { singSince = songSince = performance.now(); restDue = songSince + R(40000, 60000); }
+      if (!tourOn && !pr && !raging && !op && (M.mode === 'walk' || M.mode === 'jump')) {
+        if (!pl) {
+          const t0 = performance.now(), byUser = t0 - (S.userSkipAt || 0) < 1500, vibing = singSince && t0 - songSince > 2500;
+          if (byUser && vibing) { queue.push({ k: 'annoyed', skip: true }); skipHandled = true; }        // the visitor skipped the track while it was singing
+          else if (!byUser) queue.push(vibing && S.rec.pos > .6 ? { k: 'annoyed' } : { k: 'end' });       // stopped mid-song = angry; the side running out by itself = sad
+        }
+        interrupt();
+      }
+    }
+    if (S.rec.index !== lastIdx) { lastIdx = S.rec.index; songSince = performance.now(); if (skipHandled) skipHandled = false; else if (S.motor && welcomed && !tourOn && !pr) { queue.push({ k: 'track', title: S.tracks[lastIdx]?.title || 'this one' }); interrupt(); } }
     modeStep(dt, t, k);
     if (M.go) { const go = M.go; if (go.g !== gen) { M.go = null; go.rej('x'); } else { const p = go.path[go.i], dx = p.x - M.x, dy = p.y - M.y, d = Math.hypot(dx, dy), v = (reduce ? 400 : 210) * dt;
       if (d <= Math.max(2, v)) { M.x = p.x; M.y = p.y; if (++go.i >= go.path.length) { M.go = null; go.res(); } } else { M.x += (dx / d) * v; M.y += (dy / d) * v; if (Math.abs(dx) > 1) M.face = dx > 0 ? 1 : -1; M.ph += dt * 13; M.sit = 0; } } }
     M.pop = Math.min(1, M.pop + dt * (reduce ? 20 : 2.6)); const pop = 1 + Math.sin(M.pop * Math.PI) * .12 * (M.pop < 1), sc = M.pop < 1 ? Math.min(1, M.pop * 1.6) : 1;
     const tb = torchBusy(), sing = isSinging(); let lv = 0;
-    if (playing && !tb) {
+    if (M.rest && !tb) { if (M.rest === 1) { M.ot = .14 + .12 * Math.abs(Math.sin(t * 3.2)); M.wt = .5; } }      // resting: no lip-sync, just catching breath
+    else if (playing && !tb) {
       lv = audio.level ? audio.level() : 0; if (lv < .02) lv = .22 + .2 * Math.abs(Math.sin(t * 7));
       if (sing) { const syl = Math.abs(Math.sin(t * 8.5 + Math.sin(t * 2.3) * 2)); M.ot = cl(.2 + syl * (.5 + lv * .4), .12, 1); M.wt = .3 + .45 * Math.abs(Math.sin(t * 5.3 + 1)); }     // real singing: the mouth opens and closes on every syllable, even in quiet bits
       else { M.ot = cl(lv * 1.7, .05, 1); M.wt = .45 + Math.sin(t * 9) * .3; }
@@ -900,7 +955,8 @@ export function initMascot(S, audio, api) {
     const sw = Math.sin(t * 1.7) * 2.5, A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
     A(M.L, E.al, E.hl, 12, 1, E.al2); const [hxr, hyr] = A(M.Rm, E.ar, E.hr, 88, -1, E.ar2);
     E.mc.setAttribute('transform', `translate(${hxr} ${hyr})rotate(${(-12 + (sing ? Math.sin(t * 6) * 5 : 0)).toFixed(1)})scale(${(1.45 * M.mic * (1 + (sing ? lv * .08 : 0))).toFixed(3)})`); E.mc.style.display = M.mic > .03 ? '' : 'none';
-    if (sing && now > noteT) { noteT = now + R(340, 640); notes(); }     // a note every beat or so, every time the mic is out E.fg.style.display = M.fing ? '' : 'none'; if (M.fing) E.fg.setAttribute('transform', `translate(${hxr} ${hyr})`);
+    if (sing && now > noteT) { noteT = now + R(340, 640); notes(); }     // a note every beat or so, every time the mic is out
+    E.fg.style.display = M.fing ? '' : 'none'; if (M.fing) E.fg.setAttribute('transform', `translate(${hxr} ${hyr})scale(1.3)rotate(${(Math.sin(now / 45) * 6).toFixed(1)})`);     // the middle finger: big, and it trembles with rage
     chalk.classList.toggle('on', !!chalkAim);
     if (chalkAim) {
       chalk.style.left = `${((hxr + 20) / 140) * 100}%`; chalk.style.top = `${((hyr + 14) / 140) * 100}%`;
