@@ -123,7 +123,7 @@ export function initMascot(S, audio, api) {
     document.querySelectorAll('.domain,.sub,.title,.artist,.tagline,.hint.show,.seek__t,.dot span').forEach((e) => add(tx(e)));
     $$('.skip,.seek,.dot,.links a').forEach((e) => add(e.getBoundingClientRect()));
     if (!namePanel.hidden) add(namePanel.getBoundingClientRect(), 6, 'name-panel');
-    if (!nameDoodle.hidden && !nameDoodle.classList.contains('measuring')) add(nameDoodle.getBoundingClientRect(), 6, 'name-doodle');
+    if (!nameDoodle.hidden && !nameDoodle.classList.contains('measuring') && !writingDoodle) add(nameDoodle.getBoundingClientRect(), 6, 'name-doodle');
     return out;
   }
   const hit = (x, y, rs) => rs.some((k) => x - BW < k.r && x + BW > k.l && y - BH < k.b - .01 && y > k.t + .01);
@@ -331,7 +331,7 @@ export function initMascot(S, audio, api) {
     gs = { s: 'new', asked: gs.asked + 1 }; gset(gs);
     setChip('new here? want a quick tour?', [['yes!', () => { gs = { s: 'accepted', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'tour' }); interrupt(); }], ['no thanks', () => { gs = { s: 'declined', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'later' }); interrupt(); }]], 16000);
   };
-  let reaskDone = false, songSince = 0, skipHandled = false, restDue = performance.now() + 55000, nextDoodleAt = performance.now() + 22000, fingAt = 0, ringAt = 0, lastTick = performance.now(), wLast = 'walk', wSince = performance.now(), raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
+  let writingDoodle = false, reaskDone = false, songSince = 0, skipHandled = false, restDue = performance.now() + 55000, nextDoodleAt = performance.now() + 22000, fingAt = 0, ringAt = 0, lastTick = performance.now(), wLast = 'walk', wSince = performance.now(), raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
   const ease = (p) => p * p * (3 - 2 * p), lerp = (a, b, p) => a + (b - a) * p;
   function hands2(a, b) {                       // both hands onto two screen points (stretchy cartoon arms)
     const u = size / 140, hs = [a, b].map((p) => [50 + ((p.x - M.x) / u) * M.face, 118 + (p.y - M.y) / u]).sort((p, q) => p[0] - q[0]), A2 = ([sx, sy], px) => [(Math.atan2(sy - 68, sx - px) * 180) / Math.PI, Math.hypot(sx - px, sy - 68)];
@@ -463,22 +463,28 @@ export function initMascot(S, audio, api) {
     return completed;
   }
   function freeDoodleSpot(w, h) {
-    // scan the whole viewport: text and controls must stay clear; the deck art and props may be written over (it is chalk on a desk)
+    // the signature goes where the bot can really stand: text must stay clear of text/controls, and the strip of floor beside it (where the bot will walk letter by letter) must be free
     const hard = [], soft = [];
     rects().forEach((r) => (r.n ? soft : hard).push({ l: r.l - 4, t: r.t - 4, r: r.r + 4, b: r.b + 4 }));
     const addHard = (el, pad = 8) => { if (!el || el.hidden) return; const r = el.getBoundingClientRect(); if (r.width > 1 && r.height > 1) hard.push({ l: r.left - pad, t: r.top - pad, r: r.right + pad, b: r.bottom + pad }); };
-    addHard(btn, 10); addHard(bub, 8); addHard(chip, 8); addHard(ring, 8);
-    const ov = (x, y, k) => Math.max(0, Math.min(x + w, k.r) - Math.max(x, k.l)) * Math.max(0, Math.min(y + h, k.b) - Math.max(y, k.t));
-    if (w > innerWidth - 16) return null;
-    let best = null, bs = 1e18;
-    for (let fy = .06; fy <= .94; fy += .04) for (let fx = .08; fx <= .92; fx += .08) {
-      const x = cl(innerWidth * fx - w / 2, 8, innerWidth - w - 8), y = cl(innerHeight * fy - h / 2, 8, innerHeight - h - 8);
-      if (hard.some((k) => ov(x, y, k) > 0)) continue;
-      const sc = soft.reduce((n, k) => n + ov(x, y, k), 0) + Math.abs(fx - .5) * 400 + Math.abs(fy - .5) * -40;     // prefer empty desk, then little prop overlap, then the middle
-      if (sc < bs) { bs = sc; best = { x, y, w, h }; }
+    addHard(bub, 8); addHard(chip, 8); addHard(ring, 8);
+    const rs = rects(), ov = (x, y, k) => Math.max(0, Math.min(x + w, k.r) - Math.max(x, k.l)) * Math.max(0, Math.min(y + h, k.b) - Math.max(y, k.t));
+    if (w > innerWidth - BW - 70) return null;
+    for (let pass = 0; pass < 2; pass++) {     // pass 0: stand on empty desk only; pass 1: may stand in front of props/deck art
+      let best = null, bs = 1e18;
+      for (let fy = .1; fy <= .82; fy += .04) for (let fx = .1; fx <= .9; fx += .08) {
+        const x = cl(innerWidth * fx - w / 2, BW + 52, innerWidth - w - 8), y = cl(innerHeight * fy - h / 2, 8, innerHeight - h - 8);
+        if (x + w > innerWidth - 8 || hard.some((k) => ov(x, y, k) > 0)) continue;
+        const standY = y + h * .46 + BH * .8; if (standY > innerHeight - 10) continue;
+        let ok = true; for (let sx = x - 40; sx <= x + w - 30; sx += 36) { const cx = cl(sx, BW + 8, innerWidth - BW - 8); if (!inV(cx, standY) || hit(cx, standY, pass ? hard : rs)) { ok = false; break; } }
+        if (!ok) continue;
+        const sc = soft.reduce((n, k) => n + ov(x, y, k), 0) + Math.abs(fx - .5) * 300;
+        if (sc < bs) { bs = sc; best = { x, y, w, h }; }
+      }
+      if (best) return best;
     }
-    if (!best) console.warn('[mascot] no free spot for the name doodle');
-    return best;
+    console.warn('[mascot] no free spot for the name doodle');
+    return null;
   }
 
   function autographStrokePaths(character, rect) {
@@ -520,6 +526,8 @@ export function initMascot(S, audio, api) {
     return [[point(left, bottom), point(left + rect.width * .12, top), point(midX, midY), point(right - rect.width * .08, top + rect.height * .08), point(right, bottom)]];
   }
 
+  const stepTo = (x, y, g) => new Promise((res, rej) => { if (Math.hypot(x - M.x, y - M.y) < 3) return res(); M.go = { path: [{ x: M.x, y: M.y }, { x, y }], i: 1, res, rej, g, t0: performance.now() }; });   // a short real walk (feet moving), no teleporting
+  const dust = (p) => { if (reduce) return; const e = Object.assign(document.createElement('span'), { className: 'mdust' }); e.style.cssText = `left:${p.x}px;top:${p.y}px;--dx:${R(-9, 9).toFixed(1)}px;--dy:${R(2, 12).toFixed(1)}px`; document.body.append(e); e.onanimationend = () => e.remove(); };
   async function moveChalkAlong(points, duration, g) {
     if (!points.length) return;
     const segmentCount = Math.max(1, points.length - 1);
@@ -530,10 +538,9 @@ export function initMascot(S, audio, api) {
         const t = step / steps;
         const eased = t * t * (3 - 2 * t);
         const point = { x: a.x + (b.x - a.x) * eased, y: a.y + (b.y - a.y) * eased };
-        M.face = point.x >= M.x ? 1 : -1;
-        M.tgt = point;
+        M.tgt = point; M.tilt = 2 + ((segment + step) % 2) * 2;      // eyes follow the chalk, the body rocks a little with each stroke
         reach(point.x, point.y, 92);
-        chalkAim = point; chalk.classList.add('on');
+        chalkAim = point; chalk.classList.add('on'); if (Math.random() < .55) dust(point);
         await wait(beat, g);
       }
     }
@@ -544,7 +551,7 @@ export function initMascot(S, audio, api) {
 
     // Build independent, upright glyphs: this is a hand-printed autograph, not joined cursive.
     nameDoodleText.replaceChildren();
-    const autographSize = cl((innerWidth - 96) / Math.max(1, visitorName.length * .46), 20, 52);
+    const autographSize = cl((innerWidth - 96) / Math.max(1, visitorName.length * .46), 20, 46);
     nameDoodleText.style.fontSize = `${autographSize}px`;
     const glyphs = Array.from(visitorName, (character) => {
       const glyph = document.createElement('span');
@@ -567,49 +574,57 @@ export function initMascot(S, audio, api) {
     nameDoodle.className = `mname-doodle${withHeart ? ' has-heart' : ''} measuring`;
     nameDoodle.hidden = false;
 
+    const fail = () => { nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle'; return false; };
     const w = nameDoodle.offsetWidth, h = nameDoodle.offsetHeight, spot = freeDoodleSpot(w, h);
-    if (!spot) { nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle'; return false; }
+    if (!spot) return fail();
     nameDoodle.style.left = '0'; nameDoodle.style.top = '0';
-    nameDoodle.style.setProperty('--tilt', `${R(-1.6, 1.4).toFixed(2)}deg`);
+    nameDoodle.style.setProperty('--tilt', `${R(-1.2, 1.0).toFixed(2)}deg`);
     nameDoodle.style.transform = `translate(${spot.x}px,${spot.y}px) rotate(var(--tilt))`;
     nameDoodle.classList.remove('measuring');
 
     const firstGlyph = glyphs.find((glyph) => !glyph.classList.contains('is-space')) || glyphs[0];
     const firstRect = firstGlyph?.getBoundingClientRect();
-    if (!firstRect) { nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle'; return false; }
-    const firstTarget = { x: firstRect.left + firstRect.width / 2, y: firstRect.top + firstRect.height * .58 };
-    const stand = nearTo(firstTarget.x, firstTarget.y, spot.w + 18);
-    if (!stand) { nameDoodle.hidden = true; nameDoodle.className = 'mname-doodle'; return false; }
+    if (!firstRect) return fail();
+    const strokeY = (r) => r.top + r.height * .485;                       // middle of the printed strokes inside a glyph box
+    const standY = cl(strokeY(firstRect) + BH * .8, BH + 8, innerHeight - 8);       // feet sit below the line: the writing arm reaches up and across, the body stays beside the letters
+    const standX = (r) => cl(r.left + r.width / 2 - 40, BW + 8, innerWidth - BW - 8);   // body just left of the letter being written
+    const firstTarget = { x: firstRect.left + firstRect.width / 2, y: strokeY(firstRect) };
 
     let completed = false;
+    writingDoodle = true;
     try {
-      await goTo(stand, g, true);
+      M.sit = 0; M.dance = 0; M.micT = 0; M.sway = 0; M.face = 1; arms([-50, 26], [-50, 26]);
+      await goTo({ x: standX(firstRect), y: standY }, g, true);          // walk to the spot first. nothing is written until the bot is really there
+      M.face = 1; M.tgt = firstTarget; mood('curious', 4); arms([84, 24], [-70, 28]);
+      await wait(450, g);
       nameDoodle.classList.add('writing');
-      M.face = firstTarget.x >= M.x ? 1 : -1;
-      M.tgt = firstTarget; M.tilt = R(-2.2, 2.2); mood('curious', 4);
-      arms([-76, 27], [-88, 27]);
-      await wait(320, g);
 
-      // Reveal each printed glyph slowly while the chalk follows its individual stroke path.
+      // One letter at a time: step beside it, reach, write it stroke by stroke while the letter is revealed at the same pace.
       for (const glyph of glyphs) {
-        if (glyph.classList.contains('is-space')) { await wait(180, g); continue; }
-        const r = glyph.getBoundingClientRect();
+        if (glyph.classList.contains('is-space')) { await wait(220, g); continue; }
+        const r = glyph.getBoundingClientRect(), tx = standX(r);
+        if (Math.abs(tx - M.x) > 5) {
+          chalkAim = null; chalk.classList.remove('on'); M.tilt = 0; arms([84, 24], [-60, 26]); M.tgt = { x: r.left + r.width / 2, y: strokeY(r) };
+          await stepTo(tx, standY, g); M.face = 1;
+        }
         const duration = Number(glyph.dataset.drawMs) || 600;
-        glyph.style.setProperty('--draw-ms', `${duration}ms`);
-        glyph.classList.add('written');
         const paths = autographStrokePaths(glyph.textContent, r);
         const eachStroke = duration / Math.max(1, paths.length);
+        glyph.style.setProperty('--draw-ms', `${Math.round(duration + 110 * Math.max(0, paths.length - 1))}ms`);
+        glyph.classList.add('written');
         for (let p = 0; p < paths.length; p++) {
           await moveChalkAlong(paths[p], eachStroke, g);
-          if (p < paths.length - 1) await wait(110, g); // lift the chalk between strokes
+          if (p < paths.length - 1) { chalk.classList.remove('on'); await wait(110, g); }       // lift the chalk between strokes
         }
-        await wait(90, g);
+        chalk.classList.remove('on'); await wait(120, g);
       }
 
       // A small hand-drawn heart is an occasional finishing flourish.
       if (withHeart) {
         const heartPath = nameHeart.querySelector('path');
         const heartRect = nameHeart.getBoundingClientRect();
+        chalkAim = null; chalk.classList.remove('on'); arms([84, 24], [-60, 26]);
+        await stepTo(cl(heartRect.left + heartRect.width / 2 - 40, BW + 8, innerWidth - BW - 8), standY, g); M.face = 1;
         const total = heartPath.getTotalLength(), points = [];
         for (let i = 0; i <= 16; i++) {
           const q = heartPath.getPointAtLength(total * i / 16);
@@ -619,8 +634,7 @@ export function initMascot(S, audio, api) {
         await moveChalkAlong(points, 2100, g);
       }
 
-      chalkAim = null; chalk.classList.remove('on'); arms(...REST);
-      M.tgt = null; M.tilt = 0; mood('happy', 1.8);
+      chalkAim = null; chalk.classList.remove('on'); M.tilt = 0; arms([-60, 28], [-60, 28]);
       completed = true;
       doodleSeenEver = true; doodleVisited = true;
       markStored('local', DOODLE_KEY); markStored('session', DOODLE_VISIT);
@@ -639,7 +653,14 @@ export function initMascot(S, audio, api) {
         }, 18000);
         doodleFadeTimer = 0;
       }, 60000);
+
+      // step back from the board, look at the work, say something
+      const bx = M.x - 14, by = M.y + 64;
+      if (inV(bx, by) && !hit(bx, by, rects())) await stepTo(bx, by, g);
+      M.tgt = { x: spot.x + spot.w / 2, y: spot.y + spot.h / 2 }; M.face = M.tgt.x >= M.x ? 1 : -1; mood('happy', 2.4); M.glad = 1;
+      await say(addressVisitor(pick(['there. signed. 😎', 'not bad, right?', 'my best work.', 'sign here. no wait, i did.'])), 'say', g, 700);
     } finally {
+      writingDoodle = false;
       chalkAim = null; chalk.classList.remove('on'); M.tgt = null;
       M.tilt = 0; arms(...REST);
       if (!completed) {
@@ -1031,7 +1052,7 @@ export function initMascot(S, audio, api) {
   on(window, 'pointermove', (e) => { if (e.pointerType === 'mouse') { mx = e.clientX; my = e.clientY; } idleAt = performance.now(); if (M.sleep) activity(); });
   on(window, 'keydown', () => { activity(); if (curious) interrupt(); }); on(window, 'scroll', activity, { passive: true });
   let rt = 0; on(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { measure(); if (M.mode === 'walk' && !op && !raging && !curious && (hit(M.x, M.y, rects()) || !inV(M.x, M.y))) { const s = spots(rects()); if (s.length) { const p = pick(s); M.x = p.x; M.y = p.y; interrupt(); } } }, 160); });
-  const settle = setInterval(() => { if (!M.go && !M.sleep && M.mode === 'walk' && !tourOn && !curious && !op && !raging && !M.grip && hit(M.x, M.y, rects())) { const s = spots(rects()); if (s.length) { queue.unshift({ k: 'move', ...pick(s) }); interrupt(); } } }, 800);
+  const settle = setInterval(() => { if (!M.go && !M.sleep && M.mode === 'walk' && !tourOn && !curious && !op && !raging && !writingDoodle && !M.grip && hit(M.x, M.y, rects())) { const s = spots(rects()); if (s.length) { queue.unshift({ k: 'move', ...pick(s) }); interrupt(); } } }, 800);
   const watch = setInterval(() => {       // watchdog: no mode, flag or loop can stay stuck
     const now = performance.now(); if (M.mode !== wLast) { wLast = M.mode; wSince = now; }
     if (M.mode === 'held' && !drag) { M.mode = 'fall'; M.vx = M.vy = 0; }

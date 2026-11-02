@@ -465,3 +465,7 @@ a{color:inherit}
 /* Static v8 */
 .m-wob{animation:mwob2 .8s ease-in-out}
 @keyframes mwob2{20%{transform:translateX(var(--wd,0)) rotate(.8deg)}50%{transform:translateX(calc(var(--wd,0) * .3)) rotate(-.6deg)}80%{transform:translateX(calc(var(--wd,0) * -.15))}}
+
+.mdust{position:fixed;z-index:37;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:rgba(255,250,235,.8);pointer-events:none;animation:mdust .55s ease-out forwards}
+@keyframes mdust{to{transform:translate(var(--dx),var(--dy)) scale(.25);opacity:0}}
+@media (prefers-reduced-motion:reduce){.mdust{display:none}}
