@@ -86,6 +86,23 @@ function relayout() {
 }
 
 /* ───────── tracks ───────── */
+async function resolveTrackUrl(track) {
+  if (!Array.isArray(track.filenames) || !track.filenames.length) {
+    return `/songs/${encodeURIComponent(track.filename || '')}`;
+  }
+  const candidates = track.filenames;
+  for (const filename of candidates) {
+    if (!filename) continue;
+    const url = `/songs/${encodeURIComponent(filename)}`;
+    try {
+      const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      if (response.ok) return url;
+    } catch { /* try the next supported extension */ }
+  }
+  // Keep a deterministic default so a missing file fails through the normal audio fallback.
+  return `/songs/${encodeURIComponent(track.filename || candidates[0] || '')}`;
+}
+
 async function loadTracks() {
   let list = null;
   try {
@@ -93,7 +110,11 @@ async function loadTracks() {
     if (res.ok) list = (await res.json()).tracks;
   } catch { /* fall through */ }
   if (!Array.isArray(list) || !list.length) list = ['song1.m4a', 'song2.mp3', 'song3.m4a'].map((f, i) => ({ filename: f, title: `Track ${i + 1}` }));
-  S.tracks = list.map((t) => ({ url: `/songs/${t.filename}`, title: t.title || '', artist: t.artist || '' }));
+  S.tracks = await Promise.all(list.map(async (t) => ({
+    url: await resolveTrackUrl(t),
+    title: t.title || '',
+    artist: t.artist || ''
+  })));
   S.dur = list.map((t) => (Number(t.duration) > 0 ? Number(t.duration) : 0));
   audio.tracks = S.tracks;
   relayout();
@@ -555,16 +576,47 @@ const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s
 let paintedT = '', paintedDot = -1, seekDrag = null;
 function buildDots() {
   el.dots.textContent = '';
-  S.tracks.forEach((t, i) => {
+  // A fixed three-slot window: previous, current, next.
+  for (const slot of [-1, 0, 1]) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'dot';
     b.innerHTML = '<i></i><span></span>';
-    b.lastChild.textContent = t.title || `Track ${i + 1}`;
-    b.setAttribute('aria-label', `Play ${t.title || 'track ' + (i + 1)}`);
-    b.addEventListener('click', () => { audio.unlock(); skipTo(i); });
+    b.dataset.slot = String(slot);
+    b.addEventListener('click', () => {
+      const index = Number(b.dataset.trackIndex);
+      if (b.disabled || !S.tracks[index]) return;
+      audio.unlock(); skipTo(index);
+    });
     el.dots.appendChild(b);
-  });
+  }
   paintedDot = -1;
+  paintTrackWindow(S.rec.index);
+}
+
+function paintTrackWindow(currentIndex) {
+  const buttons = el.dots.querySelectorAll('.dot');
+  const trackCount = S.tracks.length;
+  if (!trackCount) {
+    buttons.forEach((button) => { button.disabled = true; button.classList.add('is-empty'); });
+    return;
+  }
+  buttons.forEach((button, slotIndex) => {
+    // Wrap previous / current / next around the playlist so all three slots stay populated.
+    const trackIndex = (currentIndex + slotIndex - 1 + trackCount) % trackCount;
+    const track = S.tracks[trackIndex];
+    const label = button.lastElementChild;
+    button.disabled = !track;
+    button.dataset.trackIndex = track ? String(trackIndex) : '';
+    button.classList.toggle('is-on', !!track && trackIndex === currentIndex);
+    button.classList.toggle('is-side', !!track && trackIndex !== currentIndex);
+    button.classList.toggle('is-empty', !track);
+    label.textContent = track ? (track.title || `Track ${trackIndex + 1}`) : '';
+    button.setAttribute('aria-label', track
+      ? (trackIndex === currentIndex ? `Current track: ${track.title}` : `Play ${track.title}`)
+      : 'No track');
+    if (trackIndex === currentIndex && track) button.setAttribute('aria-current', 'true');
+    else button.removeAttribute('aria-current');
+  });
 }
 function paintTransport(idx, pos) {
   const span = S.span[idx] || 0, f = span ? clamp(pos / span, 0, 1) : 0;
@@ -578,7 +630,7 @@ function paintTransport(idx, pos) {
   }
   if (idx !== paintedDot) {
     paintedDot = idx;
-    el.dots.querySelectorAll('.dot').forEach((d, i) => { d.classList.toggle('is-on', i === idx); if (i === idx) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current'); });
+    paintTrackWindow(idx);
   }
 }
 function seekTo(i, pos) {

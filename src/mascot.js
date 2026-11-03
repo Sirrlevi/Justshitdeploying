@@ -1,6 +1,7 @@
 /* Static — the after-hours mascot. A silent SVG/CSS/JS overlay: no mic, no speech, no network.
    It reads the real player state, lip-syncs to the real audio level, and only ever stands in free space
    or on the outer edge of things (it never covers text or controls). */
+import { BeatTracker } from './beat.js';
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
 const R = (a, b) => a + Math.random() * (b - a), pick = (a) => a[(Math.random() * a.length) | 0], cl = (v, a, b) => Math.min(b, Math.max(a, v));
 const PAPER = '#f4ecd9', INK = '#1d140e', BR = '#d9b47a', TAU = Math.PI * 2;
@@ -42,6 +43,52 @@ const LINES = {
   hit_plant: ['the plant caught me. thanks, plant.', 'leafy. judging me quietly.'], hit_books: ['ow. hardcover.', 'reading is dangerous.'], hit_deck: ['solid wood. ow.', 'the deck says no.'],
   hit_sketchbook: ['soft landing on the sketchbook.', 'i’m in the drawing now.'], hit_oldbook: ['dusty. achoo!', 'old book. older bruise.'],
 };
+Object.assign(LINES, {
+  feel_hype: ['okay THIS one has energy!', 'oh we’re going UP. hold my antenna.', 'the bass is talking. i’m listening!', 'jump scare of joy incoming 💥'],
+  feel_groove: ['mmm. nice groove.', 'steady beat. i can work with this.', 'this one’s got a swing to it.', 'bobbing. involuntarily. send help.'],
+  feel_chill: ['ooh, a slow one. i’m melting.', 'chai-and-rain kind of song.', 'okay. shoulders down. easy now.', 'softly, softly… 🌙'],
+  feel_moody: ['this one has feelings.', 'quiet. dark. i like it.', 'late-night song, no doubt.', 'don’t look at me. i’m having a moment.'],
+  shift_up: ['whoa, tempo jump! okay okay okay!', 'from sleepy to sparkly. i respect it.', 'oh, we’re speeding up!'],
+  shift_down: ['aaand… we land softly.', 'cooling down. nice.', 'a breather track. thank you.'],
+  drop: ['DROP!!', 'oh here it comes—', 'THERE it is!!', 'that drop though!'],
+  loud: ['EARS!! my tiny ears!', 'too loud too loud!!', 'volume nahi, volcano!', 'my antenna is vibrating!'],
+  quiet: ['hello? did the sound leave?', 'i can hear my own thoughts. scary.', 'psst, it’s whisper mode.'],
+  mute: ['…is it broken? or just dramatic?', 'silence. my second favourite song.'],
+  fast: ['chipmunk mode! 🐿️', 'speeeedy! i’m dizzy.'],
+  slow: ['slooow-mooo…', 'everything sounds like honey.'],
+  norm: ['okay, back to normal speed. phew.', 'normal speed. my brain thanks you.'],
+  needleUp: ['ooh, you’re carrying the needle!', 'careful careful careful…'],
+  needleDown: ['needle down. here we go.', 'smooth landing. 10/10.', 'drop it like it’s hot. (gently.)'],
+  parked: ['needle’s home. good night, little needle.', 'parked. very tidy.'],
+  lever: ['pause? ok, i’ll wait.', 'lever up. very official.'],
+  hold: ['whoa, you’re holding the record!', 'is it stuck? is it okay?'],
+  scratch: ['wiki wiki wiki!', 'DJ in the house!', 'scratch it! scratch it!'],
+  flick: ['WHEEEE!', 'flick of the wrist. respect.'],
+  rewind: ['backwards? bold.', 'rewind! the future is behind us!'],
+  seek: ['skipping ahead? spoilers!', 'jump! i like the jumping.'],
+  motorOn: ['spinning up! here we go.', 'lights, platter, action.'],
+  spam: ['are we doing morse code?', 'flip flop flip. i’m getting dizzy.', 'blink blink. who’s there?'],
+  tickle: ['hehe stop! tickles!', 'ahahaha not the antenna!', 'okay okay okay okay!!'],
+  konami: ['↑↑↓↓←→←→BA… you know the code!', 'secret unlocked. 30 lives.', 'cheat code accepted. dance mode: MAX.'],
+  moon: ['smooth. very smooth.', 'moonwalking. don’t tell anyone.', 'am i going forward or backward? yes.'],
+  idea: ['💡 i had an idea!', 'eureka! …and it’s gone.', 'idea! wait, what was it?'],
+  belly: ['beep. boop. do not press.', 'bzzzt. rebooting… jk.', 'that’s my tummy button!', 'press again and i’ll order pizza.'],
+  mime: ['…i’m trapped in a box!', '*knock knock* let me out!', 'a wall! right here. i swear.'],
+  mirror: ['who’s that handsome bot?', 'hello, gorgeous.', 'this record has a good side. i have two.'],
+  boo: ['BOO!!', 'got you! i wasn’t even asleep.', 'sleeping? never. BOO!'],
+  bow: ['thank you, thank you. you’re too kind.', 'bow. flourish. exit stage left.', 'encore? no? ok. *bows*'],
+  guitar: ['ROCK AND ROLL! 🤘', 'this one needs an air guitar.', 'shredding. silently.'],
+  midnight: ['it’s past midnight. the best records get played now.', 'late night, low lights. perfect.', 'a night owl! i respect that.'],
+  boss: ['that’s the boss’s name. i dust it daily.', 'NEERAJ. legend. architect of this desk.'],
+  wakeSoft: ['mmh… oh. music. okay, i’m up.', '*yawn* …is that a beat? i’m awake.', 'five more minutes… no wait, THIS song.'],
+  lounge: ['this spot is mine now.', 'best seat in the house.', 'cozy. very cozy.', 'i could live here.'],
+  watchRec: ['round and round and round…', 'hypnotic. don’t look too long.', 'just watching the groove go by.'],
+  gOpen: ['okay! i point, you try. deal?', 'quick guide. i point, you press.', 'ready? i’ll show, you do.'],
+  gNice: ['nice! you’re a natural.', 'yes! exactly like that.', 'look at you go!', 'perfect. i taught you well. (i didn’t.)'],
+  gIdle: ['take your time. or tap “show me”.', 'stuck? tap “show me”, i’ll do it first.'],
+  gLate: ['no stress. tap skip if you like.', 'still here! skip is right there.'],
+  gDone: ['that’s every control. tap the ? any time for a refresher.', 'guide done! the ? in the corner brings me back.'],
+});
 const bags = {};
 const L = (k, t) => { const b = bags[k] || (bags[k] = { q: [], last: '' }); if (!b.q.length) { b.q = [...LINES[k]].sort(() => Math.random() - .5); if (b.q.length > 1 && b.q[b.q.length - 1] === b.last) b.q.reverse(); } b.last = b.q.pop(); return t ? b.last.replace('{t}', t) : b.last; };
 const SVG = `<svg viewBox="-20 -14 140 140" aria-hidden="true" focusable="false"><defs>
@@ -51,13 +98,13 @@ const SVG = `<svg viewBox="-20 -14 140 140" aria-hidden="true" focusable="false"
 <radialGradient id="sh2" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#a28d78"/><stop offset="1" stop-color="#33291f"/></radialGradient>
 <filter id="sbl" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.8"/></filter>
 <clipPath id="ecl"><ellipse rx="10.5" ry="13.5"/></clipPath><clipPath id="mcl"><path class="mo2"/></clipPath></defs>
-<ellipse class="sh" cx="50" cy="118" rx="32" ry="5.5" fill="#000" opacity=".5" filter="url(#sbl)"/>
+<ellipse class="sh" cx="50" cy="118" rx="32" ry="5.5" fill="#000" opacity=".5" filter="url(#sbl)"/><ellipse class="sh0" cx="50" cy="117" rx="17" ry="2.6" fill="#000" opacity=".6" filter="url(#sbl)"/>
 <ellipse class="fl" cx="35" cy="113" rx="12" ry="6.5" fill="url(#sh2)"/><ellipse class="fr" cx="65" cy="113" rx="12" ry="6.5" fill="url(#sh2)"/>
-<g class="bd"><path class="an" d="M34 14Q26-2 22-9" stroke="#8a7352" stroke-width="3" fill="none" stroke-linecap="round"/><circle class="bu" cx="22" cy="-10" r="5" fill="url(#se)"/>
+<g class="bd"><path class="an" d="M34 14Q26-2 22-9" stroke="#8a7352" stroke-width="3" fill="none" stroke-linecap="round"/><circle class="bhalo" cx="22" cy="-10" r="10" fill="#ffe08a" opacity="0" filter="url(#sbl)"/><circle class="bu" cx="22" cy="-10" r="5" fill="url(#se)"/>
 <path d="M50 7C83 7 99 34 99 66C99 98 80 114 50 114C20 114 1 98 1 66C1 34 17 7 50 7Z" fill="url(#sb)"/><path d="M50 7C83 7 99 34 99 66C99 98 80 114 50 114C20 114 1 98 1 66C1 34 17 7 50 7Z" fill="url(#ss)"/>
 <path d="M87 30C97 48 98 74 88 94" stroke="${BR}" stroke-opacity=".6" stroke-width="3" fill="none" stroke-linecap="round"/><ellipse cx="34" cy="22" rx="17" ry="7" fill="#fff" opacity=".3" transform="rotate(-26 34 22)" filter="url(#sbl)"/>
 <ellipse cx="22" cy="68" rx="6.5" ry="4" fill="#e59a78" style="opacity:var(--bl,.35)"/><ellipse cx="78" cy="68" rx="6.5" ry="4" fill="#e59a78" style="opacity:var(--bl,.35)"/>
-<circle cx="50" cy="97" r="11" fill="url(#se)" stroke="#6e5530"/><circle cx="50" cy="97" r="3.4" fill="#2a1d12"/><circle cx="46" cy="92.5" r="1.8" fill="#fff" opacity=".7"/>
+<circle class="bel" cx="50" cy="97" r="11" fill="url(#se)" stroke="#6e5530"/><circle cx="50" cy="97" r="3.4" fill="#2a1d12"/><circle cx="46" cy="92.5" r="1.8" fill="#fff" opacity=".7"/>
 ${['el', 'er'].map((c) => `<g class="${c}"><ellipse rx="10.5" ry="13.5" fill="url(#se)" stroke="#6e5530"/><ellipse class="pp" rx="4.9" ry="7" fill="#24180e"/><circle cx="-3.2" cy="-4.8" r="2.4" fill="#fff" opacity=".92"/><circle cx="2.8" cy="3.2" r="1.1" fill="#fff" opacity=".6"/><g clip-path="url(#ecl)"><rect class="lid" x="-16" y="-18" width="32" height="3" fill="#5f5043"/><ellipse class="lo" cx="0" cy="15" rx="15" ry="0" fill="#5f5043"/></g></g>`).join('')}
 <g class="brs" opacity="0"><line class="bl" x1="25" y1="29" x2="43" y2="29" stroke="#2b2018" stroke-width="3.4" stroke-linecap="round"/><line class="br" x1="57" y1="29" x2="75" y2="29" stroke="#2b2018" stroke-width="3.4" stroke-linecap="round"/></g>
 <path class="mo" fill="${INK}" stroke="${BR}" stroke-width="1.4" stroke-linejoin="round"/><ellipse class="tg" cx="50" cy="86" rx="7" ry="4" fill="#e8838f" clip-path="url(#mcl)" opacity="0"/>
@@ -102,12 +149,14 @@ export function initMascot(S, audio, api) {
   document.body.append(ring, bub, btn, spot, rig, namePanel, nameDoodle);
   btn.classList.add('on');
   btn.style.transform = `translate3d(${Math.max(8, innerWidth / 2 - 36)}px,${Math.max(64, innerHeight * .16)}px,0)`;
-  const q = (c) => btn.querySelector('.' + c), E = Object.fromEntries('bd sh fl fr an bu el er mo mo2 al al2 hl ar ar2 hr mc bi fg mnst brs bl br tg'.split(' ').map((c) => [c, q(c)]));
+  const q = (c) => btn.querySelector('.' + c), E = Object.fromEntries('bd sh sh0 bhalo bel fl fr an bu el er mo mo2 al al2 hl ar ar2 hr mc bi fg mnst brs bl br tg'.split(' ').map((c) => [c, q(c)]));
   const pps = btn.querySelectorAll('.pp'), bsvg = bub.querySelector('svg'), tt = bub.querySelector('b'), gg = bub.querySelector('i');
   const lids = [...btn.querySelectorAll('.lid')], los = [...btn.querySelectorAll('.lo')];
   let size = 72, BW = 29, BH = 63, gen = 0, alive = true, playing = false, idleAt = performance.now(), T0 = 0, B = null, ht = 0, noteT = 0, told = new Set(), queue = [], lastIdx = S.rec.index, needleT = 0, tapN = 0, welcomed = false, tourT = performance.now() + 9000, mx = -1, my = -1;
   const M = { mood: { n: 'calm', t: 0 }, shake: 0, tilt: 0, nod: 0, mad: 0, pet: 0, petting: 0, eff: 0, grip: null, fing: 0, mon: 0, mode: 'walk', vx: 0, vy: 0, vr: 0, rot: 0, sq: 0, peak: 0, dizzy: 0, wide: 0, hx: 0, hy: 0, jp: null, dc: null, dance: 0, struggle: 0, sway: 0, run: 0, x: 0, y: 0, face: 1, pop: 0, ph: 0, mic: 0, micT: 0, o: 0, ot: 0, w: .5, wt: .5, lx: 0, ly: 0, nb: 2, bl: 0, sleep: 0, sit: 0, rest: 0, sp: 0, glad: 0, go: null, tgt: null, hold: 0,
     L: { a: 102, l: 22, ta: 102, tl: 22 }, Rm: { a: 78, l: 22, ta: 78, tl: 22 } };
+  Object.assign(M, { dph: 0, vel: 0, lean: 0, lookS: 0, sx: 0, sy: 0, sacc: 1, air: 0, moon: false, flip: null, gs: null, gAuto: 0, gside: 0, bdir: 1, idea: 0 });
+  const beat = new BeatTracker();
   const REST = [[102, 22], [78, 22]], arms = (l, r) => { if (l) [M.L.ta, M.L.tl] = l; if (r) [M.Rm.ta, M.Rm.tl] = r; };
   const pend = new Set();
   const wait = (ms, g) => new Promise((res, rej) => { if (g !== gen) return rej('x'); const p = { rej }; p.t = setTimeout(() => { pend.delete(p); res(); }, ms); pend.add(p); });
@@ -121,7 +170,8 @@ export function initMascot(S, audio, api) {
     const d = $('#deckFit'); if (d) add(d.getBoundingClientRect(), 0, 'deck'); props().forEach((p) => out.push(p));
     const tx = (e) => { const g = document.createRange(); g.selectNodeContents(e); return g.getBoundingClientRect(); };
     document.querySelectorAll('.domain,.sub,.title,.artist,.tagline,.hint.show,.seek__t,.dot span').forEach((e) => add(tx(e)));
-    $$('.skip,.seek,.dot,.links a').forEach((e) => add(e.getBoundingClientRect()));
+    $$('.skip,.seek,.dot,.links a,.mhelp').forEach((e) => add(e.getBoundingClientRect()));
+    if (!gpanel.hidden) add(gpanel.getBoundingClientRect(), 6, 'guide');
     if (!namePanel.hidden) add(namePanel.getBoundingClientRect(), 6, 'name-panel');
     if (!nameDoodle.hidden && !nameDoodle.classList.contains('measuring') && !writingDoodle) add(nameDoodle.getBoundingClientRect(), 6, 'name-doodle');
     return out;
@@ -184,15 +234,19 @@ export function initMascot(S, audio, api) {
   }
   const hide = () => { bub.hidden = true; B = null; M.hold = 0; M.tgt = null; };
   let speechUntil = 0;
-  const readMs = (t) => 1900 + t.length * 62;                           // reading time: ~16 characters a second, plus a beat
+  const readMs = (t) => cl(1500 + t.length * 58 + (t.match(/[.!?…]/g) || []).length * 160, 1500, 8200);   // reading time: ~17 characters a second, a beat per sentence
+  const TYPE = { shout: .78, angry: .8, think: 1.12, sleepy: 1.45, sly: 1.05 };                              // how fast each kind of bubble is typed
+  const pace = (c, kind) => (/[.!?]/.test(c) ? 230 : c === '…' ? 320 : /[,;:]/.test(c) ? 135 : c === ' ' ? 62 : 44 + R(0, 16)) * (TYPE[kind] || 1);   // pauses after punctuation, tiny jitter on letters
   async function say(text, kind, g, hold, urgent) {
     const gap = speechUntil - performance.now(); if (gap > 0 && !urgent) await wait(gap, g);          // never talk over a bubble someone is still reading
-    show(text, kind);
+    show(text, kind); if (B) B.typeUntil = performance.now() + text.length * 58 + 400; M.gside = Math.random() < .5 ? 0 : 1; if (!urgent) await wait(110, g);     // a small breath before the first word
     if (text === '…') { tt.innerHTML = '<span class="dd"><i></i><i></i><i></i></span>'; gg.textContent = ''; const h = Math.max(hold ?? 0, 1300); speechUntil = performance.now() + h + 400; await wait(h, g); hide(); return; }
-    for (let i = 1; i <= text.length; i++) { tt.textContent = text.slice(0, i); gg.textContent = text.slice(i); [M.ot, M.wt] = visemeOf(text[i - 1].toLowerCase()); await wait(/[.,!?…]/.test(text[i - 1]) ? 190 : 46, g); }
+    for (let i = 1; i <= text.length; i++) { tt.textContent = text.slice(0, i); gg.textContent = text.slice(i); [M.ot, M.wt] = visemeOf(text[i - 1].toLowerCase()); await wait(pace(text[i - 1], kind), g); }
     M.ot = .05; const h = Math.max(hold ?? 0, readMs(text)); speechUntil = performance.now() + h + 600; await wait(h, g); hide();
   }
   function blurt(text, kind = 'say', ms = 1500) { const h = Math.max(ms, readMs(text)); show(text, kind); tt.textContent = text; gg.textContent = ''; speechUntil = performance.now() + h + 500; setTimeout(() => { if (B && B.text === text) hide(); }, h); }   // instant bubble, for reactions that can't wait
+
+  const chirp = (key, kind = 'say', ms = 1600) => { if (speechUntil - performance.now() > 500) return false; blurt(L(key), kind, ms); return true; };   // a reaction line that never talks over a bubble someone is reading
 
   /* ── behaviours ── */
   const notes = () => {
@@ -208,9 +262,10 @@ export function initMascot(S, audio, api) {
     restDue = performance.now() + R(55000, 85000);
     try {
       M.dance = 0; M.micT = 0; M.sway = 0; M.rest = 1; mood('sad', 2.2); arms([60, 26], [120, 26]);
-      const sp = spots(rects()), edges = sp.filter((q) => q.kind === 'edge'), spot = pick(edges.length ? edges : sp);
+      const spot = pickRest() || pick(spots(rects()));
       if (spot && !reduce) await goTo(spot, g, true);
-      M.sit = spot && spot.kind === 'edge' ? 1 : 0; M.tilt = 6; M.rest = 1; arms([60, 26], [120, 26]);
+      if (spot && spot.kind !== 'floor' && spot.kind !== 'home') settleAt(spot); else M.sit = 0;
+      M.tilt = 6; M.rest = 1; arms([60, 26], [120, 26]);
       await say(L('tired'), 'sleepy', g, 500);
       const endAt = performance.now() + R(5500, 8500), v = pick(['fan', 'sip', 'listen', 'stretch']);
       if (v === 'fan') { for (let i = 0; i < 40 && playing && performance.now() < endAt; i++) { arms(null, [-125 + (i % 2) * 30, 30]); await wait(220, g); } }
@@ -234,15 +289,20 @@ export function initMascot(S, audio, api) {
     M.micT = 0; let last = '', still = 0;
     const bout = performance.now() + R(22000, 38000);     // a bout of full energy, then hand control back to decide(): pranks, easter eggs and rests all live there
     let anchor = { x: M.x, y: M.y, t: performance.now() };
-    const MOVERS = ['strut', 'micWalk', 'jump', 'micJump', 'strut', 'micWalk'], STILLS = ['dance', 'micDance', 'bang', 'spin', 'micSway', 'emote'];
+    const TBL = {       // what it feels like doing depends on what the music feels like (beat.mood): hype jumps and headbangs, chill sways, moody sits with it
+      hype: { mv: .78, mov: ['jump', 'micJump', 'strut', 'micWalk', 'jump', 'strut'], st: ['bang', 'spin', 'dance', 'micDance', 'guitar', 'bang', 'emote'] },
+      groove: { mv: .7, mov: ['strut', 'micWalk', 'jump', 'micJump', 'strut', 'micWalk'], st: ['dance', 'micDance', 'bang', 'spin', 'micSway', 'emote'] },
+      chill: { mv: .38, mov: ['micWalk', 'strut'], st: ['micSway', 'dance', 'micSway', 'emote', 'sway'] },
+      moody: { mv: .25, mov: ['micWalk'], st: ['micSway', 'micSway', 'emote', 'nod'] },
+    }, isMover = (m) => ['strut', 'micWalk', 'jump', 'micJump', 'travel'].includes(m);
     const calm = () => { M.dance = 0; M.micT = 0; M.sway = 0; arms(...REST); };
     const hopSide = async (range, ms, ah) => { const x = cl(M.x + R(-range, range), BW + 8, innerWidth - BW - 8); await hop(hit(x, M.y, rects()) ? M.x : x, M.y, g, ms, ah); };
     while (playing && performance.now() < bout) {
-      let mv; for (let n = 0; n < 6; n++) { mv = reduce ? pick(['micSway', 'dance', 'emote']) : (still >= 1 || Math.random() < .7) ? pick(MOVERS) : pick(STILLS); if (mv !== last) break; }
-      still = MOVERS.includes(mv) ? 0 : still + 1; last = mv;
+      let mv; for (let n = 0; n < 6; n++) { const tb = TBL[beat.mood] || TBL.groove; mv = reduce ? pick(['micSway', 'dance', 'emote']) : (still >= 1 || Math.random() < tb.mv) ? pick(tb.mov) : pick(tb.st); if (mv !== last) break; }
+      still = isMover(mv) ? 0 : still + 1; last = mv;
       const nowT = performance.now(); if (Math.hypot(M.x - anchor.x, M.y - anchor.y) > 60) anchor = { x: M.x, y: M.y, t: nowT };
       else if (!reduce && nowT - anchor.t > 6000) { mv = 'travel'; still = 0; }       // anti-stuck: never stand on one spot for more than ~6s while performing     // never two still moves in a row, never the same move twice
-      mood(pick(['happy', 'excited', 'happy']), 2.4);
+      mood(musicMood(), 2.4);
       try {
         if (mv === 'travel') {
           M.micT = Math.random() < .5 ? 1 : 0; M.dance = pick(DANCES); mood('excited', 2);
@@ -263,6 +323,12 @@ export function initMascot(S, audio, api) {
           M.dance = 4; await wait(R(2000, 3000), g); if (!reduce) { M.dance = pick([6, 9]); await wait(1300, g); }
         } else if (mv === 'spin') {
           M.dance = pick(DANCES); for (let i = 0; i < 3 && playing; i++) { M.sp = 1; await wait(950, g); }
+        } else if (mv === 'guitar') {
+          M.dance = 10; mood('hyped', 2.4); if (Math.random() < .5) chirp('guitar', 'shout', 1500); await wait(R(3600, 5600), g);
+        } else if (mv === 'sway') {
+          M.sway = 1; M.nod = 1; mood('bliss', 3); for (let i = 0; i < 3 && playing; i++) { await hopSide(50, 620, 8); await wait(R(600, 1100), g); }
+        } else if (mv === 'nod') {
+          M.nod = 1; M.sway = 1; mood('dreamy', 3.5); await wait(R(3000, 4500), g);
         } else if (mv === 'micSway') {
           M.micT = 1; M.sway = 1;
           if (reduce) await wait(2500, g); else for (let i = 0; i < 3 && playing; i++) { await hopSide(70, 420, 18); await wait(R(150, 450), g); }
@@ -290,7 +356,7 @@ export function initMascot(S, audio, api) {
   const nearSpot = (el) => { const r = el.getBoundingClientRect(), tx = r.left + r.width / 2, ty = r.top + r.height / 2; return { r, tx, ty, s: nearTo(tx, ty, r.width) }; };
   const reach = (tx, ty, max = 60) => { const u = size / 140, a = Math.atan2(ty - (M.y - 52 * u), tx - (M.x + 38 * u * M.face)), d = Math.hypot(tx - M.x, ty - M.y); arms(null, [((M.face > 0 ? a : Math.PI - a) * 180) / Math.PI, cl(d / u - 22, 18, max)]); };
   const ringOn = (r) => { ringAt = performance.now(); Object.assign(ring.style, { left: r.left - 6 + 'px', top: r.top - 6 + 'px', width: r.width + 12 + 'px', height: r.height + 12 + 'px' }); ring.hidden = false; };
-  const hop = (x, y, g, ms = 650, ah) => new Promise((res, rej) => { M.mode = 'jump'; M.jp = { x0: M.x, y0: M.y, x1: x, y1: y, t: 0, ms: reduce ? 60 : ms, res, rej, g, h: ah ?? Math.min(150, 58 + Math.hypot(x - M.x, y - M.y) * .14) }; });
+  const hop = (x, y, g, ms = 650, ah) => new Promise((res, rej) => { M.mode = 'jump'; M.jp = { x0: M.x, y0: M.y, x1: x, y1: y, t: 0, pre: reduce ? 0 : .07, ms: reduce ? 60 : ms, res, rej, g, h: ah ?? Math.min(150, 58 + Math.hypot(x - M.x, y - M.y) * .14) }; });
   const until = async (f, g) => { while (!f()) await wait(120, g); };
   const chip = Object.assign(document.createElement('div'), { className: 'mchip', hidden: true }); document.body.append(chip);
   const hideChip = () => { chip.hidden = true; chipExp = 0; chipPinned = false; chip.classList.remove('docked'); chip.style.transform = ''; };
@@ -329,7 +395,7 @@ export function initMascot(S, audio, api) {
   const offer = () => {
     if (gs.s !== 'new' || gs.asked >= 3) return;                         // answered once (yes or no) = never asked again; ignored 3 times = stop nagging
     gs = { s: 'new', asked: gs.asked + 1 }; gset(gs);
-    setChip('new here? want a quick tour?', [['yes!', () => { gs = { s: 'accepted', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'tour' }); interrupt(); }], ['no thanks', () => { gs = { s: 'declined', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'later' }); interrupt(); }]], 16000);
+    setChip('new here? want a quick tour?', [['yes!', () => { gs = { s: 'accepted', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'guide' }); interrupt(); }], ['no thanks', () => { gs = { s: 'declined', asked: gs.asked }; gset(gs); hideChip(); queue.push({ k: 'later' }); interrupt(); }]], 16000);
   };
   let writingDoodle = false, reaskDone = false, songSince = 0, skipHandled = false, restDue = performance.now() + 55000, nextDoodleAt = performance.now() + 22000, fingAt = 0, ringAt = 0, lastTick = performance.now(), wLast = 'walk', wSince = performance.now(), raging = false, op = false, singSince = 0, lastTapAt = 0, annoy = 0, purrAt = 0, heartAt = 0, lastF = -1;
   const ease = (p) => p * p * (3 - 2 * p), lerp = (a, b, p) => a + (b - a) * p;
@@ -352,11 +418,12 @@ export function initMascot(S, audio, api) {
         const extra = o.avoid ? $$(o.avoid).map((e) => { const q = e.getBoundingClientRect(); return { l: q.left - 4, t: q.top - 4, r: q.right + 4, b: q.bottom + 4 }; }) : [];
         const obs = rects().filter((k) => k.n !== 'deck' && !anc(k)).concat(own, extra), c = [];
         const ovl = (x, y) => oth.reduce((s, q) => s + Math.max(0, Math.min(x + BW, q.right) - Math.max(x - BW, q.left)) * Math.max(0, Math.min(y, q.bottom) - Math.max(y - BH, q.top)), 0);
-        for (const d of [rc + BW + 4, rc + BW + 16]) for (let a = 0; a < 360; a += 15) { const x = tx + Math.cos((a * Math.PI) / 180) * d, y = ty + Math.sin((a * Math.PI) / 180) * d + BH * .5; if (inV(x, y) && !hit(x, y, obs)) c.push({ x, y, sc: ovl(x, y) * .03 + Math.hypot(x - M.x, y - M.y) * .4 + (d > rc + BW + 5 ? 40 : 0) }); }
+        for (const d of o.pointOnly ? [rc + BW + 14, rc + BW + 28] : [rc + BW + 4, rc + BW + 16]) for (let a = 0; a < 360; a += 15) { const x = tx + Math.cos((a * Math.PI) / 180) * d, y = ty + Math.sin((a * Math.PI) / 180) * d + BH * .5; if (inV(x, y) && !hit(x, y, obs)) c.push({ x, y, sc: ovl(x, y) * .03 + Math.hypot(x - M.x, y - M.y) * .4 + (d > rc + BW + 5 ? 40 : 0) }); }
         c.sort((p, q) => p.sc - q.sc); const st = c[0];
         if (!st) { blurt(pick(['no room to squeeze in there.', 'i can’t get close enough.', 'hmm. too crowded here.']), 'say', 1800); return false; }
         if (hit(st.x, st.y, rects())) { const w = nearTo(st.x, st.y - BH * .5, 0); if (w) await goTo(w, g, true); await hop(st.x, st.y, g, 520); } else await goTo(st, g, true);
       }
+      if (o.pointOnly) { M.face = tx >= M.x ? 1 : -1; M.tgt = { x: tx, y: ty }; reach(tx, ty, 62); mood('curious', 2.4); await wait(350, g); return true; }
       M.face = tx >= M.x ? 1 : -1; const q0 = pt(); M.grip = { x: q0.x, y: q0.y, r: rc, spin: 0, pt, rot: readRot, rot0: readRot ? readRot() : 0, follow: !!o.follow, ox: M.x - q0.x, oy: M.y - q0.y }; M.eff = o.rage ? 1 : .3;
       await wait(o.rage ? 110 : 450, g); for (let i = 0; i < 4 && !touching(); i++) await wait(150, g);
       if (!touching()) { blurt(pick(['can’t reach that one!', 'too far for my little arms.', 'hmm. not from here.']), 'say', 1800); return false; }       // no contact, no action
@@ -371,26 +438,6 @@ export function initMascot(S, audio, api) {
     } finally { o.abort?.(); M.grip = null; M.eff = 0; op = false; }
   }
   const armPt = () => { const p = $('.arm-hit'); if (!p || !p.getScreenCTM()) return null; const q = p.getPointAtLength(p.getTotalLength() * .62), s = p.ownerSVGElement.createSVGPoint(); s.x = q.x; s.y = q.y; const w = s.matrixTransform(p.getScreenCTM()); return { x: w.x, y: w.y }; };
-  const STEPS = [
-    { sel: '#power', text: 'this is the power switch. watch me flip it!', mk: () => ({ done: () => api.setMotor(true) }) },
-    { sel: '#arm', ring: false, when: () => S.arm.mode !== 'down', text: 'now the needle. i’ll carry the tonearm onto the record.', mk: () => { const th0 = api.theta(), th1 = api.thetaFor(S.rec.index, S.rec.pos); return { pt: armPt, follow: true, minT: 1800, start: () => api.armStart(), progress: (p) => api.armMove(lerp(th0, th1, ease(p))), done: () => api.armDrop(), abort: () => api.armDrop() }; } },
-    { sel: '#lever', when: () => S.arm.mode === 'down', text: 'this little lever lifts the needle…', mk: () => ({ track: $('#leverBody'), done: () => api.lever() }) },
-    { sel: '#lever', when: () => S.arm.cueRaised, text: '…and sets it back down.', mk: () => ({ track: $('#leverBody'), quick: true, done: () => api.lever() }) },
-    { sel: '#volume', text: 'turn this knob for volume. like so…', mk: () => { const v0 = S.volume; return { progress: (p) => api.setVolume(p < .5 ? lerp(v0, .2, ease(p * 2)) : lerp(.2, v0, ease(p * 2 - 1))), done: () => api.setVolume(v0) }; } },
-    { sel: '.seek__knob', text: 'drag this knob to jump around the song.', mk: () => ({ avoid: '.seek__bar', done: () => api.cueTo(S.rec.index, (S.span[S.rec.index] || 60) * .55) }) },
-    { sel: () => { const d = $$('.dot'); return d[S.rec.index === d.length - 1 ? 0 : d.length - 1]; }, text: 'and tap a dot to pick another song.', mk: () => ({ quick: true, done: () => api.skipTo(S.rec.index === S.tracks.length - 1 ? 0 : S.tracks.length - 1) }) },
-  ];
-  async function tour(g) {
-    tourOn = true; tourStop = false; chipPinned = true; chip.classList.add('docked'); chip.style.transform = 'none'; setChip('tour on', [['stop', () => { tourStop = true; interrupt(); }]]);
-    try {
-      M.face = 1; arms(null, [-62, 30]); mood('happy', 3); await say(visitorName ? `okay, ${visitorName}. follow me. i’ll show you everything.` : 'okay! follow me. i’ll show you everything.', 'say', g, 800);
-      for (const st of STEPS) {
-        if (st.when && !st.when()) continue; const el = typeof st.sel === 'function' ? st.sel() : $(st.sel); if (!el) continue;
-        if (st.ring !== false) ringOn(el.getBoundingClientRect()); const ok = await operate(el, g, { ...st.mk(), say: st.text }); ring.hidden = true; arms(...REST); if (!ok) await wait(600, g);
-      }
-      mood('happy', 3); M.dance = 1; await say(L('proud'), 'say', g, 2000);
-    } finally { tourOn = false; M.sway = 0; M.dance = 0; ring.hidden = true; hideChip(); }
-  }
   // closest free spot to the engraving: right under the deck edge, head almost touching the letters, never covering them
   function standNear(t, tr) {
     const rs = rects(), deck = rs.find((k) => k.n === 'deck'), best = { d: 1e9, p: null }, top = deck ? deck.b : t.y + 10;
@@ -757,26 +804,36 @@ export function initMascot(S, audio, api) {
       case 7: return [[[180, 30], [0, 30]], [[-90, 30], [0, 30]], [[180, 30], [-90, 30]], [[-90, 30], [-90, 30]]][Math.floor(t * 3.2) % 4];   // robot
       case 8: { const o = Math.sin(t * 14) > 0; return [[o ? 0 : 150, o ? 38 : 26], [o ? 180 : 30, o ? 38 : 26]]; }                  // clap
       case 9: { const r = Math.sin(t * 14) * 45; return [[-110 + r, 26], [-70 - r, 26]]; }                                            // running man
+      case 10: return [[-150 + c * 8, 26], [30 + Math.sin(t * 16) * 36, 26]];                                                       // air guitar: one hand on the neck, one strumming
       default: return [[-60, 26], [-60, 26]];
     }
   };
   function modeStep(dt, t, k) {
-    discFrame(dt); const md = M.mode, now = performance.now();
+    discFrame(dt); const md = M.mode, now = performance.now(); M.air = 0;
     M.wide += ((md === 'held' || md === 'fall' || M.struggle || M.mad > 1 ? 1 : 0) - M.wide) * k; M.sq = Math.max(0, M.sq - dt * 3.2); M.dizzy = Math.max(0, M.dizzy - dt); if (md !== 'disc') { M.struggle = 0; M.run = 0; }
     M.mon += ((raging ? 1 : 0) - M.mon) * Math.min(1, dt * 4); if (!raging) M.mad = Math.max(0, M.mad - dt * (M.petting ? .45 : .08)); M.pet = M.petting ? Math.min(1, M.pet + dt * .6) : Math.max(0, M.pet - dt * .2);
     if (M.petting) { M.glad = 1; if (now > purrAt) { purrAt = now + 3200; blurt(L('purr'), 'say', 1800); } if (now > heartAt) { heartAt = now + 700; hearts(); } }
-    if (md === 'walk' || md === 'jump') { const rt = M.sway ? Math.sin(t * 5) * 10 : M.dizzy ? Math.sin(t * 7) * 9 : M.petting ? 7 * M.face : M.eff ? -M.face * 6 * M.eff + Math.sin(t * 18) * 2.5 : raging ? Math.sin(t * 22) * 4 : M.sleep ? 7 * M.face + Math.sin(t * 1.2) * 2 : M.nod ? 5 + Math.sin(t * 2.6) * 6 : M.tilt ? M.tilt : M.dance === 2 ? Math.sin(t * 4.5) * 14 : M.dance === 4 ? Math.sin(t * 13) * 10 : M.dance === 5 ? Math.sin(t * 3) * 9 : M.dance === 6 ? Math.sin(t * 9) * 3 : M.dance === 7 ? (Math.floor(t * 3.2) % 2 ? 6 : -6) : M.dance === 8 ? Math.sin(t * 7) * 6 : M.dance === 9 ? Math.sin(t * 14) * 7 : Math.sin(t * .7) * 1.2; M.rot += (rt - M.rot) * k * 2; }
+    if (md === 'walk' || md === 'jump') { const rt = M.sway ? Math.sin(t * 5) * 10 : M.dizzy ? Math.sin(t * 7) * 9 : M.petting ? 7 * M.face : M.eff ? -M.face * 6 * M.eff + Math.sin(t * 18) * 2.5 : raging ? Math.sin(t * 22) * 4 : M.sleep ? 7 * M.face + Math.sin(t * 1.2) * 2 : M.nod ? 5 + Math.sin(t * 2.6) * 6 : M.tilt ? M.tilt : M.dance === 2 ? Math.sin(t * 4.5) * 14 : M.dance === 4 ? Math.sin(t * 13) * 10 : M.dance === 5 ? Math.sin(t * 3) * 9 : M.dance === 6 ? Math.sin(t * 9) * 3 : M.dance === 7 ? (Math.floor(t * 3.2) % 2 ? 6 : -6) : M.dance === 8 ? Math.sin(t * 7) * 6 : M.dance === 9 ? Math.sin(t * 14) * 7 : M.dance === 10 ? Math.sin(t * 5) * 9 : Math.sin(t * .7) * 1.2 + M.lookS * 2.6; M.rot += (rt + M.lean - M.rot) * k * 2; }
     if (M.eff) { M.ot = .2; M.wt = .12; M.glad = Math.max(M.glad, .5 * M.eff); }
     if (md === 'held') { M.x += (M.hx - M.x) * Math.min(1, dt * 18); M.y += (M.hy + BH * .95 - M.y) * Math.min(1, dt * 18); M.rot = cl((M.hx - M.x) * .9, -28, 28) + Math.sin(t * 9) * 7; M.ot = .9; M.wt = .5; arms([-150 + Math.sin(t * 17) * 40, 26], [-30 - Math.sin(t * 15) * 40, 26]); }
     else if (md === 'fall') physics(dt); else if (md === 'disc') disc(dt, t);
-    else if (M.jp) { const j = M.jp; if (j.g !== gen) { M.jp = null; M.mode = 'fall'; M.vx = M.vy = 0; j.rej('x'); } else { j.t += (dt * 1000) / j.ms; const u = Math.min(1, j.t); M.x = j.x0 + (j.x1 - j.x0) * u; M.y = j.y0 + (j.y1 - j.y0) * u - Math.sin(u * Math.PI) * j.h; M.face = j.x1 >= j.x0 ? 1 : -1; if (u >= 1) { M.jp = null; M.mode = 'walk'; j.res(); } } }
+    else if (M.jp) { const j = M.jp; if (j.g !== gen) { M.jp = null; M.mode = 'fall'; M.vx = M.vy = 0; j.rej('x'); } else if (j.pre > 0) { j.pre -= dt; M.sq = Math.max(M.sq, .42); } else { j.t += (dt * 1000) / j.ms; const u = Math.min(1, j.t); M.x = j.x0 + (j.x1 - j.x0) * u; M.y = j.y0 + (j.y1 - j.y0) * u - Math.sin(u * Math.PI) * j.h; M.air = Math.sin(u * Math.PI) * j.h; M.face = j.x1 >= j.x0 ? 1 : -1; if (u >= 1) { M.jp = null; M.mode = 'walk'; M.air = 0; M.sq = Math.max(M.sq, Math.min(.55, .22 + j.h / 320)); dust({ x: M.x, y: M.y - 3 }); j.res(); } } }
     else if (M.grip) {                 // hands stay on the control wherever it goes, and turn with it by exactly the amount (and direction) it really turns
       const G = M.grip, p = G.pt && G.pt(); if (p) { G.x = p.x; G.y = p.y; } if (G.rot) G.spin = ((G.rot() - G.rot0) * Math.PI) / 180;
       if (G.follow) { const q = Math.min(1, dt * 10); M.x += (G.x + G.ox - M.x) * q; M.y += (G.y + G.oy - M.y) * q; }
       const a0 = Math.atan2(M.y - BH * .5 - G.y, M.x - G.x) + G.spin, rr = G.r * .9; hands2({ x: G.x + Math.cos(a0 - .75) * rr, y: G.y + Math.sin(a0 - .75) * rr }, { x: G.x + Math.cos(a0 + .75) * rr, y: G.y + Math.sin(a0 + .75) * rr });
     }
-    else if (M.dance) { const f = danceArms(M.dance, t); if (micHeld()) arms(f[0], null); else arms(...f); }
+    else if (M.dance) { const f = danceArms(M.dance, M.dph / 9); if (micHeld()) arms(f[0], null); else arms(...f); }
     if (micHeld() && (md === 'walk' || md === 'jump') && !M.grip) { arms(null, MIC_ARM); if (!M.dance) arms([-58 + Math.sin(t * 4.2) * 36, 26], null); }     // mic hand stays up beside the mouth; the free hand pumps the beat
+    // gestures: a timed pose on top of whatever else is going on, and hands that talk along with the speech bubble
+    if (M.gs && (now > M.gs.until || M.grip || md === 'held' || md === 'disc' || raging)) M.gs = null;
+    const talk = !!B && now < (B.typeUntil || 0) && B.kind !== 'sleepy';
+    const free = md === 'walk' && !M.go && !M.dance && !M.grip && !M.eff && !M.petting && !M.sleep && !M.rest && !M.fing && !micHeld() && !torchBusy() && !chalkAim && !writingDoodle && !op && !raging;
+    if (M.gs) arms(M.gs.l, M.gs.r);
+    else if (talk && free && (M.gAuto || (Math.abs(M.L.ta - REST[0][0]) < 8 && Math.abs(M.Rm.ta - REST[1][0]) < 8))) {
+      const sg = Math.sin(t * 5.1), em = Math.max(0, Math.sin(t * 2.2 + M.gside * 2)); M.gAuto = 1;
+      if (M.gside) arms([-128 + sg * 14 - em * 10, 24 + em * 6], REST[1]); else arms(REST[0], [-52 - sg * 14 + em * 10, 24 + em * 6]);
+    } else if (M.gAuto) { M.gAuto = 0; if (free) arms(...REST); }
     E.bi.style.display = M.dizzy ? '' : 'none'; if (M.dizzy) E.bi.querySelectorAll('text').forEach((e, i) => { const a = t * 5 + i * 2.09; e.setAttribute('x', 50 + Math.cos(a) * 24); e.setAttribute('y', 2 + Math.sin(a) * 7); });
     if (!chip.hidden) { if (chipExp && performance.now() > chipExp) hideChip(); else if (Math.hypot(chipP.x - M.x, chipP.y - M.y) > 8) placeChip(); }
   }
@@ -847,6 +904,7 @@ export function initMascot(S, audio, api) {
   }
   async function wander(g) {
     if (!reduce && Math.random() < .14) return shove(g);
+    if (!reduce && Math.random() < .24) return lounge(g);
     const rs = rects(), sp = spots(rs); if (!sp.length || reduce) { await antic(g); return; }
     const home = sp.find((s) => s.kind === 'home'), t = home && Math.random() < .2 ? home : pick(sp);
     await goTo(t, g, true); M.sit = t.kind === 'edge' ? 1 : 0;      // no walkable path (boxed in by deck/text)? hop out instead of failing silently forever
@@ -855,16 +913,26 @@ export function initMascot(S, audio, api) {
   async function run(a, g) {
     if (a.k === 'nameSaved') { mood('happy', 2.5); await say(`nice to meet you, ${visitorName}!`, 'say', g, 900); offer(); return; }
     if (a.k === 'nameLater') { mood('happy', 1.5); await say('no pressure. i’ll call you friend for now.', 'say', g, 900); offer(); return; }
-    if (a.k === 'wake') { mood('surprised', 1); await say(addressVisitor(L('wake')), 'say', g); return; }
+    if (a.k === 'wake') {
+      if (a.soft) { mood('sleepy', 2.4); M.ot = 1; M.wt = .3; arms([-70, 30], [-110, 30]); await wait(1300, g); M.ot = 0; arms(...REST); mood('happy', 2); await say(L('wakeSoft'), 'say', g, 500); return; }     // woken by the music: stretch, yawn, then hello
+      mood('surprised', 1); await say(addressVisitor(L('wake')), 'say', g); return;
+    }
+    if (a.k === 'egg') return egg(g, a.n);
+    if (a.k === 'guide') return guide(g, a.from || 0);
+    if (a.k === 'guideAsk') return guideAsk(g);
+    if (a.k === 'guidePaused') { mood('happy', 1.6); helpBtn.classList.add('nudge'); setTimeout(() => helpBtn.classList.remove('nudge'), 7000); return say('guide paused. tap the ? whenever you want to go on.', 'say', g, 900); }
+    if (a.k === 'feel') {
+      mood(({ hype: 'hyped', groove: 'happy', chill: 'bliss', moody: 'dreamy' })[a.m] || 'happy', 2.6); if (!reduce && a.m === 'hype') M.sp = 1; if (a.m === 'chill' || a.m === 'moody') M.nod = 1;
+      await say(addressVisitor(L(a.key)), a.m === 'hype' ? 'shout' : a.m === 'moody' ? 'think' : 'say', g, 900); M.nod = 0; return;
+    }
     if (a.k === 'move') return goTo(a, g, true);
-    if (a.k === 'tour') return tour(g);
     if (a.k === 'ride') return ride(g);
     if (a.k === 'prank') return prank(g);
     if (a.k === 'inspect') return inspect(g);
     if (a.k === 'shove') return shove(g);
     if (a.k === 'tantrum') return tantrum(g);
     if (a.k === 'annoyed') return annoyed(g, a.skip);
-    if (a.k === 'later') { mood('happy', 1.5); return say(visitorName ? `okay, ${visitorName}. i’m here if you need me.` : 'okay! i’m here if you need me.', 'say', g, 1000); }
+    if (a.k === 'later') { mood('happy', 1.5); helpBtn.classList.add('nudge'); setTimeout(() => helpBtn.classList.remove('nudge'), 7000); return say((visitorName ? `okay, ${visitorName}. ` : 'okay! ') + 'the ? in the corner brings the guide back any time.', 'say', g, 1000); }
     if (a.k === 'tap') {
       const n = tapN++; M.sit = 0;
       if (!a.hard && speechUntil - performance.now() > 900) { M.glad = 1; M.sq = .45; arms([-60, 28], [-60, 28]); mood('surprised', .5); await wait(500, g); return; }     // mid-sentence: a little jump, no new bubble
@@ -873,7 +941,7 @@ export function initMascot(S, audio, api) {
       else if (n % 4 === 1 && !playing && !reduce) { M.micT = 1; M.hold = 1; mood('happy', 2); arms(null, [138, 30]); notes(); await say(L('mic'), 'think', g, 1400); M.hold = 0; M.micT = 0; }
       else { if (n % 3 === 0 && !reduce) M.sp = 1; mood('happy', 1.6); arms([-60, 28], [-60, 28]); await say(addressVisitor(L('tap')), 'say', g); }
     } else if (a.k === 'track') { if (playing && !reduce) { arms([-70, 28], [-70, 28]); M.sp = 1; } mood('excited', 2); await say(addressVisitor(L('track', a.title)), 'say', g, 1200); }
-    else if (a.k === 'end') { mood('sad', 1.8); await say(L('end'), 'say', g); }
+    else if (a.k === 'end') { mood('sad', 1.8); await say(L('end'), 'say', g); if (!reduce && Math.random() < .35) return egg(g, 'bow'); }
     else if (a.k === 'land') {
       arms([-50, 26], [-50, 26]);
       if (a.v > 1000) { M.dizzy = 3; await say(L('dizzy'), 'think', g, 1800, true); mood('sad', 2); }
@@ -914,7 +982,10 @@ export function initMascot(S, audio, api) {
     if (!visitorName && !reaskDone && !playing && quiet > 14000 && now - born > 40000 && !tourOn && !pr && !raging && !op && !M.petting && !M.sleep) {      // never got a name: ask once more before nodding off
       reaskDone = true; nameSkipped = false; mood('curious', 2); await say('psst… i never got your name. tell me, and i’ll write it in chalk for you.', 'say', g, 800); openNamePanel(); return;
     }
-    if (!playing && quiet > 30000) { mood('sleepy', 6); M.ot = 1; M.wt = .3; M.nod = 1; await wait(1500, g); M.ot = 0; await wait(1300, g); M.nod = 0; M.sleep = 1; show('zZz…', 'sleepy'); return wait(6e5, g); }        // yawns, nods off, then sleeps until touched
+    if (!reduce && now > eggAt && now - born > 60000 && !tourOn && !pr && !raging && !curious && !op && !drag && !M.petting && !M.sleep && namePanel.hidden && !chipExp) {     // a rare easter egg, every few minutes at most
+      eggAt = now + R(150000, 320000); const n = pickEgg(); if (n) return egg(g, n);
+    }
+    if (!playing && quiet > 30000) return snooze(g);        // walks to a cosy spot, yawns, nods off, then sleeps until touched
     if (!reduce && now > prankAt && (playing || quiet > 3500) && (playing || quiet < 26000) && now - born > 18000 && !M.petting) { prankAt = now + R(22000, 48000); return playing ? prank(g) : Math.random() < .5 && !S.motor && S.arm.mode === 'parked' ? inspect(g) : ride(g); }
     if (playing && now > restDue) return rest(g);
     if (playing) return perform(g);
@@ -929,12 +1000,354 @@ export function initMascot(S, audio, api) {
     scared: { cover: 0, tilt: 0, low: 0, smile: -.35, brow: 1, bt: -8, pup: .55 }, surprised: { cover: 0, tilt: 0, low: 0, smile: -.1, brow: 1, bt: -4, pup: .7 },
     smug: { cover: .38, tilt: 8, low: .12, smile: .8, brow: .1, bt: 8, pup: .95 }, curious: { cover: 0, tilt: 0, low: 0, smile: .5, brow: .6, bt: -4, pup: 1.12 },
     dizzy: { cover: .12, tilt: 0, low: 0, smile: -.25, brow: 0, bt: 0, pup: .85 }, shy: { cover: .18, tilt: -6, low: .3, smile: .55, brow: .2, bt: -6, pup: 1.1 },
+    bliss: { cover: .5, tilt: 0, low: .5, smile: 1, brow: .1, bt: -2, pup: 1.1 }, dreamy: { cover: .38, tilt: -5, low: .25, smile: .45, brow: .25, bt: -5, pup: 1.2 }, hyped: { cover: 0, tilt: 0, low: .35, smile: 1, brow: 1, bt: -6, pup: 1.28 },
   };
   const FS = { ...MOODS.calm }, mood = (n, s = 2) => { M.mood = { n, t: s }; };
   function faceTarget() {
-    const base = M.sleep ? 'sleepy' : M.dizzy > 0 ? 'dizzy' : M.mode === 'held' || M.mode === 'fall' ? 'scared' : raging ? 'angry' : M.petting ? 'happy' : M.mood.t > 0 ? M.mood.n : M.mad > .35 ? 'angry' : playing ? 'happy' : 'calm';
+    const base = M.sleep ? 'sleepy' : M.dizzy > 0 ? 'dizzy' : M.mode === 'held' || M.mode === 'fall' ? 'scared' : raging ? 'angry' : M.petting ? 'happy' : M.mood.t > 0 ? M.mood.n : M.mad > .35 ? 'angry' : playing ? musicFace() : 'calm';
     const f = { ...MOODS[base] }, a = raging ? 1 : cl((M.mad - .15) / .85, 0, 1); if (a > 0 && base !== 'angry') for (const key in f) f[key] = lerp(f[key], MOODS.angry[key], a * .8);
     if (M.sleep) f.cover = .97; f.low = cl(f.low + M.glad * .4, 0, .85); return f;
+  }
+
+  /* ── v2: music feel, attention, reactions, resting spots, easter eggs, the interactive guide ── */
+  const FEEL = { hype: 'hyped', groove: 'happy', chill: 'bliss', moody: 'dreamy' };
+  const musicFace = () => FEEL[beat.mood] || 'happy';
+  const musicMood = () => pick({ hype: ['excited', 'hyped', 'happy'], groove: ['happy', 'excited', 'happy'], chill: ['bliss', 'happy', 'bliss'], moody: ['dreamy', 'bliss', 'calm'] }[beat.mood] || ['happy']);
+  const walkMul = () => (playing && !tourOn && !pr ? { hype: 1.3, groove: 1, chill: .8, moody: .7 }[beat.mood] || 1 : 1);   // it walks to the tempo of the song
+  const gesture = (l, r, ms = 900) => { M.gs = { l, r, until: performance.now() + ms }; };
+  const box = (x, y, w, h) => ({ left: x, top: y, width: w, height: h, right: x + w, bottom: y + h });
+  let faceAt = 0, zT = 0, lastBeatNote = 0, prevFeel = '', lastMouseAt = 0, lastDown = null, ptrDown = null, focusAtt = null, touchPt = null, glance = null, glanceAt = performance.now() + 6000, watchNext = 0, revSince = 0, lastSign = 0, scratchN = 0, scratchT = 0;
+
+  /* beats, drops and the first impression of each track */
+  function onBeat() {
+    M.bdir = -M.bdir;
+    if (M.dance || M.sway) { const d = (((M.dph - Math.PI / 2) % Math.PI) + Math.PI * 1.5) % Math.PI - Math.PI / 2; M.dph -= d * .4; }       // nudge the hop so its peak lands on the beat
+    if (isSinging() && beat.strength > .45 && performance.now() - lastBeatNote > 380 && Math.random() < .55) { lastBeatNote = performance.now(); notes(); }
+  }
+  function onDrop() {
+    if (reduce || tourOn || pr || raging || op || M.sleep || M.rest || curious) return;
+    M.sp = 1; M.sq = .5; mood('hyped', 2.4); gesture([-115, 32], [-65, 32], 1300); for (let i = 0; i < 3; i++) setTimeout(notes, i * 140);
+    if (Math.random() < .6) chirp('drop', 'shout', 1200);
+  }
+  function onJudged() {
+    const was = prevFeel, m = beat.mood; prevFeel = m;
+    if (!welcomed || tourOn || pr || raging || op || curious || M.sleep || M.rest || speechUntil - performance.now() > 500) return;
+    const up = (was === 'chill' || was === 'moody') && (m === 'hype' || m === 'groove'), down = (was === 'hype' || was === 'groove') && (m === 'chill' || m === 'moody');
+    if (!up && !down && was && Math.random() < .35) return;
+    queue.push({ k: 'feel', m, key: up ? 'shift_up' : down ? 'shift_down' : 'feel_' + m }); interrupt();
+  }
+  const zzz = () => {
+    if (reduce) return; const r = btn.getBoundingClientRect(), e = Object.assign(document.createElement('span'), { className: 'mz', textContent: pick(['z', 'Z', 'z']) });
+    e.style.cssText = `left:${r.left + r.width * (M.face > 0 ? .68 : .22)}px;top:${r.top + r.height * .12}px;--dx:${(R(6, 20) * (M.face > 0 ? 1 : -1)).toFixed(0)}px;font-size:${R(13, 19).toFixed(0)}px`;
+    document.body.append(e); e.onanimationend = () => e.remove();
+  };
+
+  /* ── attention: it looks at what you are doing, not just at the cursor ── */
+  const CTRL = '#power,#volume,#trim,#lever,#seek,.dot,.skip,#platterHit,#armKey,.mhelp';
+  const ctrlOf = (n) => (n && n.closest ? n.closest(CTRL) : null);
+  const mid = (el, why) => { if (!el || !el.isConnected) return null; const r = el.getBoundingClientRect(); return r.width || r.height ? { x: r.left + r.width / 2, y: r.top + r.height / 2, why, el } : null; };
+  const recMid = () => mid($('#record'), 'record');
+  const glanceTargets = () => {
+    const out = $$('#record,#lamp,#title,.engrave,#power,#volume,#trim,.seek__bar').filter((e) => e.getBoundingClientRect().width > 0), a = $('.arm-hit');
+    if (a) out.push(a); if (playing) { const r = $('#record'); if (r) out.push(r, r); }
+    props().forEach((p) => out.push({ x: (p.l + p.r) / 2, y: (p.t + p.b) / 2, why: 'glance' })); return out;
+  };
+  function attention(now) {
+    if (!op && S.arm.mode === 'held') { const p = armPt(); if (p) return { x: p.x, y: p.y, why: 'arm' }; }                       // you are carrying the needle
+    if (!op && S.hold && S.hold.active) { const r = recMid(); if (r) return r; }                                                  // you are holding the record
+    if (ptrDown && now - ptrDown.t < (ptrDown.up ? 1700 : 6000)) { const r = mid(ptrDown.el, 'control'); if (r) return r; }       // the control you just touched
+    if (focusAtt && now < focusAtt.until) { const r = mid(focusAtt.el, 'focus'); if (r) return r; }                               // the control you selected with the keyboard
+    if (touchPt && now - touchPt.t < 2600) return touchPt;
+    if (glance && now < glance.until) { const th = glance.th, r = th.getBoundingClientRect ? mid(th, 'glance') : th; if (r) return r; }
+    if (mx >= 0 && now - lastMouseAt < 7000) return { x: mx, y: my, why: 'mouse' };
+    if (now > glanceAt && !M.sleep) { glanceAt = now + R(5000, 11000); const c = glanceTargets(); if (c.length) glance = { th: pick(c), until: now + R(900, 2200) }; }   // nothing going on: a curious glance round the desk
+    return null;
+  }
+  const faceToward = (tg, now) => {
+    if (!tg || !tg.why || tg.why === 'mouse' || tg.why === 'glance' || M.go || M.dance || M.grip || M.jp || M.mode !== 'walk' || M.sleep || now < faceAt) return;
+    const sg = tg.x >= M.x ? 1 : -1; if (sg !== M.face && Math.abs(tg.x - M.x) > 70) { M.face = sg; faceAt = now + 1600; }
+  };
+  on(document, 'pointerdown', (e) => {
+    const now = performance.now(); lastDown = { el: e.target, t: now };
+    if (e.pointerType !== 'mouse') touchPt = { x: e.clientX, y: e.clientY, why: 'touch', t: now };
+    const c = ctrlOf(e.target) || (e.target.classList && e.target.classList.contains('arm-hit') ? e.target : null); if (c) ptrDown = { el: c, t: now, up: false };
+  }, { capture: true });
+  const pUp = () => { if (ptrDown) { ptrDown.up = true; ptrDown.t = performance.now(); } };
+  on(document, 'pointerup', pUp, { capture: true }); on(document, 'pointercancel', pUp, { capture: true });
+  on(document, 'focusin', (e) => { const c = ctrlOf(e.target); if (c && performance.now() - lastKeyAt < 1500) focusAtt = { el: c, until: performance.now() + 4500 }; });
+  let lastKeyAt = 0;
+
+  /* ── reactions: small, visible, never interrupting what the bot is doing ── */
+  const rxAt = {}, can = (k, ms) => { const n = performance.now(); if (n - (rxAt[k] || 0) < ms) return false; rxAt[k] = n; return true; };
+  const rx = (o) => {
+    if (o.mood) mood(o.mood, o.ms || 1.6); if (o.arms && !reduce) gesture(o.arms[0], o.arms[1], o.gms || 900);
+    if (o.sq) M.sq = Math.max(M.sq, o.sq); if (o.sp && !reduce) M.sp = 1; if (o.line) chirp(o.line, o.kind || 'say', 1700);
+  };
+  const djArms = () => { if (reduce) return; let i = 0; const iv = setInterval(() => { if (++i > 10 || !alive) return clearInterval(iv); gesture(i % 2 ? [-30, 30] : [-70, 24], i % 2 ? [-110, 24] : [-150, 30], 220); }, 180); };
+  const snap = { vol: S.volume, trim: S.trim, motor: S.motor, mode: S.arm.mode, cue: S.arm.cueRaised, hold: false, idx: S.rec.index, pos: S.rec.pos }, hist = { vol: [], motor: [] };
+  function watchUser(now) {
+    if (now < watchNext) return; watchNext = now + 120;
+    const hold = !!(S.hold && S.hold.active), am = S.arm.mode;
+    const calm = welcomed && !(op || pr || raging || curious || writingDoodle || torchInProgress || guideOn || tourOn || M.sleep || drag || (M.mode !== 'walk' && M.mode !== 'jump'));
+    if (calm) {
+      hist.vol.push([now, S.volume]); while (hist.vol.length && now - hist.vol[0][0] > 1200) hist.vol.shift();
+      const dv = S.volume - hist.vol[0][1];
+      if (S.volume > .9 && snap.vol <= .9 && can('loud', 9000)) rx({ mood: 'scared', ms: 1.4, arms: [[-105, 16], [-75, 16]], gms: 1400, sq: .35, line: 'loud', kind: 'shout' });     // hands over the ears
+      else if (dv > .38 && can('loudj', 9000)) rx({ mood: 'surprised', ms: 1.2, sq: .5, line: 'loud', kind: 'shout' });
+      else if (S.volume < .04 && snap.vol >= .04 && can('mute', 12000)) rx({ mood: 'curious', ms: 2, line: 'mute', kind: 'think' });
+      else if (dv < -.4 && S.volume < .3 && can('quiet', 12000)) rx({ mood: 'curious', ms: 1.6, line: 'quiet', kind: 'think' });
+      if (Math.abs(S.trim) > .7 && Math.abs(snap.trim) <= .7 && can('trim', 10000)) rx({ mood: S.trim > 0 ? 'excited' : 'sleepy', ms: 2, line: S.trim > 0 ? 'fast' : 'slow', sp: S.trim > 0 });
+      else if (Math.abs(S.trim) < .1 && Math.abs(snap.trim) > .5 && can('norm', 10000)) rx({ mood: 'happy', ms: 1.4, line: 'norm' });
+      if (S.motor !== snap.motor) {
+        hist.motor.push(now); hist.motor = hist.motor.filter((x) => now - x < 4500);
+        if (hist.motor.length >= 4 && can('spam', 22000)) { hist.motor = []; M.dizzy = 2; rx({ mood: 'dizzy', ms: 2.2, line: 'spam', kind: 'think' }); }          // flicking the switch like morse code
+        else if (S.motor && can('motorOn', 5000) && Math.random() < .55) rx({ mood: 'excited', ms: 1.4, sq: .3, line: 'motorOn' });
+      }
+      if (am !== snap.mode) {
+        if (am === 'held' && can('up', 8000)) rx({ mood: 'curious', ms: 2.2, line: Math.random() < .5 ? 'needleUp' : '' });
+        else if (am === 'down' && snap.mode !== 'down' && can('down', 6000)) rx({ mood: 'happy', ms: 1.6, arms: [[-58, 28], [-122, 28]], gms: 700, line: 'needleDown' });
+        else if (am === 'parked' && snap.mode !== 'parked' && can('park', 14000) && Math.random() < .4) rx({ mood: 'sleepy', ms: 1.6, line: 'parked', kind: 'think' });
+      }
+      if (S.arm.cueRaised && !snap.cue && can('lever', 12000) && Math.random() < .5) rx({ mood: 'curious', ms: 1.4, line: 'lever' });
+      if (hold && !snap.hold && can('hold', 9000) && Math.random() < .6) rx({ mood: 'surprised', ms: 1.4, line: 'hold' });
+      if (hold) {                                         // scratching: the record changes direction again and again under your finger
+        const sg = Math.abs(S.omega) > 1.5 ? Math.sign(S.omega) : 0; if (sg && sg !== lastSign) { if (lastSign) { scratchN++; scratchT = now; } lastSign = sg; } if (now - scratchT > 1500) scratchN = 0;
+        if (scratchN >= 3 && can('scratch', 14000)) { scratchN = 0; rx({ mood: 'excited', ms: 2.4, line: 'scratch', kind: 'shout' }); djArms(); }
+      } else { lastSign = 0; scratchN = 0; }
+      if (!hold && snap.hold && Math.abs(S.omega) > 12 && can('flick', 10000)) rx({ mood: 'excited', ms: 1.6, sp: true, line: 'flick', kind: 'shout' });
+      if (S.omega < -4 && S.motor) { revSince = revSince || now; if (now - revSince > 1500 && can('rewind', 25000)) { rx({ mood: 'curious', ms: 2, line: 'rewind', kind: 'think' }); if (!reduce && Math.random() < .45) { queue.push({ k: 'egg', n: 'moon' }); interrupt(); } } } else revSince = 0;
+      if (S.rec.index === snap.idx && Math.abs(S.rec.pos - snap.pos) > 2.6 && am !== 'held' && !hold && can('seek', 9000)) { focusAtt = { el: $('#seek'), until: now + 2200 }; if (Math.random() < .5) rx({ mood: 'curious', ms: 1.2, line: 'seek' }); }
+    }
+    Object.assign(snap, { vol: S.volume, trim: S.trim, motor: S.motor, mode: am, cue: S.arm.cueRaised, hold, idx: S.rec.index, pos: S.rec.pos });
+  }
+  const tk = { dir: 0, n: 0, t: 0, x: 0 };
+  function tickle(e) {                                  // a quick wiggle of the cursor right over the bot
+    if (drag || M.sleep || tourOn || pr || raging || op || curious) return; const r = btn.getBoundingClientRect();
+    if (e.clientX < r.left - 6 || e.clientX > r.right + 6 || e.clientY < r.top - 6 || e.clientY > r.bottom + 6) { tk.n = 0; tk.x = e.clientX; return; }
+    const now = performance.now(), dx = e.clientX - tk.x; tk.x = e.clientX; if (Math.abs(dx) < 3) return; const d = Math.sign(dx);
+    if (now - tk.t > 800) tk.n = 0; tk.t = now; if (d !== tk.dir) { tk.dir = d; tk.n++; }
+    if (tk.n >= 9 && can('tickle', 14000)) { tk.n = 0; M.shake = 1.1; M.glad = 1; hearts(); rx({ mood: 'happy', ms: 2, sq: .3, line: 'tickle' }); }
+  }
+  const bt = { bulb: 0, bulbT: 0, belly: 0, bellyT: 0 };
+  function bodyTap(e) {                                 // tiny hidden hot-spots: the antenna bulb (3 taps) and the tummy button (2 taps)
+    const now = performance.now(), near = (el, pad) => { const r = el.getBoundingClientRect(); return e.clientX > r.left - pad && e.clientX < r.right + pad && e.clientY > r.top - pad && e.clientY < r.bottom + pad; };
+    if (near(E.bu, 9)) { M.idea = Math.max(M.idea, .3); bt.bulb = now - bt.bulbT < 2400 ? bt.bulb + 1 : 1; bt.bulbT = now; if (bt.bulb >= 3) { bt.bulb = 0; return 'idea'; } return ''; }
+    if (near(E.bel, 3)) { bt.belly = now - bt.bellyT < 2600 ? bt.belly + 1 : 1; bt.bellyT = now; if (bt.belly >= 2) { bt.belly = 0; return 'belly'; } }
+    return '';
+  }
+
+  /* ── natural resting spots: on a desk edge, near the turntable, on a prop; asleep there too ── */
+  const PROP_NAMES = new Set(PROPS.map((p) => p[0])), usedRest = [];
+  function restSpots() {
+    const rs = rects(), out = [], deck = rs.find((k) => k.n === 'deck'), rec = $('#record')?.getBoundingClientRect();
+    const add = (x, y, kind) => { if (inV(x, y) && !hit(x, y, rs)) out.push({ x, y, kind }); };
+    for (const r of rs) {
+      const w = r.r - r.l; if (w < BW * 1.6 || r.n === 'name-panel' || r.n === 'name-doodle' || r.n === 'guide') continue;
+      const kind = r.n === 'deck' ? 'deck' : PROP_NAMES.has(r.n) ? 'prop' : r.n ? null : 'ledge'; if (!kind) continue;
+      (w > BW * 4.5 ? [.22, .5, .78] : [.5]).forEach((f) => add(r.l + w * f, r.t, kind));
+    }
+    if (deck && rec) {
+      const cx = rec.left + rec.width / 2;
+      [-.3, 0, .3].forEach((f) => add(cx + rec.width * f, deck.t, 'vinyl'));                                                      // on the turntable's back edge, facing the record
+      for (const sd of [-1, 1]) { const x = sd < 0 ? deck.l - BW - 4 : deck.r + BW + 4; [.35, .6, .85].forEach((f) => add(x, deck.t + (deck.b - deck.t) * f + BH * .5, 'side')); }   // standing beside it (wide screens)
+      add(cx, deck.b + BH + 3, 'vinyl');
+    }
+    return out;
+  }
+  function pickRest() {
+    const sp = restSpots(); if (!sp.length) return null; const W = { vinyl: 5, side: 4.6, prop: 4, deck: 2.8, ledge: 2 };
+    for (const q of sp) {
+      q.sc = (W[q.kind] || 1) + R(0, 1.6) - Math.hypot(q.x - M.x, q.y - M.y) / 500 + (playing && (q.kind === 'vinyl' || q.kind === 'side') ? 1.6 : 0) + (S.omega > 1 && q.kind === 'vinyl' ? 1 : 0);
+      if (usedRest.some((u) => Math.hypot(u.x - q.x, u.y - q.y) < 90)) q.sc -= 3.5;      // do not always pick the same seat
+    }
+    sp.sort((a, b) => b.sc - a.sc); const q = sp[0]; usedRest.push(q); if (usedRest.length > 3) usedRest.shift(); return q;
+  }
+  const settleAt = (q) => { const rc = $('#record')?.getBoundingClientRect(), cx = rc ? rc.left + rc.width / 2 : q.x; M.sit = q.kind === 'side' ? 0 : 1; M.face = q.kind === 'side' ? (q.x < cx ? 1 : -1) : cx >= M.x ? 1 : -1; };
+  async function snooze(g) {
+    const q = reduce ? null : pickRest(); mood('sleepy', 5);
+    if (q) { await goTo(q, g, true); settleAt(q); }
+    M.ot = 1; M.wt = .3; await wait(1500, g); M.ot = 0; arms([-70, 30], [-110, 30]); await wait(900, g); arms(...REST);
+    M.nod = 1; await wait(1600, g); M.nod = 0; M.sleep = 1; if (reduce) show('zZz…', 'sleepy'); return wait(6e5, g);
+  }
+  async function lounge(g) {
+    const q = pickRest(); if (!q) return antic(g);
+    await goTo(q, g, true); settleAt(q);
+    try {
+      for (let i = 0, n = 2 + ((R(0, 3)) | 0); i < n; i++) {
+        const k = pick(S.omega > 1 ? ['watch', 'watch', 'look', 'hum', 'swing'] : ['look', 'look', 'hum', 'swing', 'yawn', 'chat']);
+        if (k === 'watch') { const r = recMid(); if (r) M.tgt = { x: r.x, y: r.y }; mood('curious', 2.4); if (Math.random() < .45) await say(L('watchRec'), 'think', g, 400); else await wait(R(2600, 4200), g); M.tgt = null; }
+        else if (k === 'look') { mood('curious', 2.4); const th = pick(glanceTargets()), m2 = th && (th.getBoundingClientRect ? mid(th, 'look') : th); M.tgt = m2 ? { x: m2.x, y: m2.y } : { x: R(0, innerWidth), y: R(0, innerHeight) }; await wait(R(1800, 3200), g); M.tgt = null; }
+        else if (k === 'hum') { mood('bliss', 3); M.nod = 1; if (!reduce) notes(); await wait(R(2400, 3600), g); M.nod = 0; }
+        else if (k === 'swing') { mood('happy', 2.4); await wait(R(2200, 3400), g); }                                           // the legs dangle on their own
+        else if (k === 'yawn') { mood('sleepy', 2.4); M.ot = 1; M.wt = .3; await wait(1500, g); M.ot = 0; }
+        else await say(L('lounge'), 'say', g);
+        await wait(R(900, 2200), g);
+      }
+    } finally { M.tgt = null; M.nod = 0; }
+  }
+
+  /* ── rare easter eggs: secret dances, odd little routines, hidden hot-spots ── */
+  const KON = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'], WORDS = { static: 'konami', neeraj: 'boss', moon: 'moon', flip: 'flip', rock: 'guitar', boo: 'boo' };
+  let eggAt = performance.now() + R(100000, 170000), midnightDone = false, kn = 0, word = '';
+  function pickEgg() {
+    const ok = []; if (!reduce) ok.push('moon', 'flip', 'mime');
+    if (!playing && !S.motor && S.arm.mode === 'parked' && $('#record')) ok.push('mirror');
+    if (!playing) ok.push('boo'); if (playing && beat.mood !== 'chill' && beat.mood !== 'moody') ok.push('guitar');
+    if (new Date().getHours() < 5 && !midnightDone) ok.push('midnight', 'midnight', 'midnight');
+    return ok.length ? pick(ok) : null;
+  }
+  async function egg(g, n) {
+    pr = true;
+    const goFar = async (min = 180) => { const far = spots(rects()).filter((q) => Math.hypot(q.x - M.x, q.y - M.y) > min); if (far.length && !reduce) await goTo(pick(far), g, true); };
+    try {
+      M.micT = 0; M.dance = 0; M.sway = 0;
+      if (n === 'konami') {
+        mood('excited', 3); M.face = 1; await say(L('konami'), 'shout', g, 500);
+        M.moon = true; arms([-35, 24], [-145, 24]); await goFar(200); M.moon = false;
+        for (const d of [2, 7, 5, 9, 8, 3]) { M.dance = d; if (!reduce) M.sp = 1; mood('excited', 1.6); notes(); hearts(); await wait(1300, g); }
+        M.dance = 0; gesture([-115, 32], [-65, 32], 1400); M.sq = .5; hearts(); await say('ta-da!', 'shout', g, 900);
+      } else if (n === 'moon') {
+        mood('smug', 3); await say(L('moon'), 'sly', g, 400); M.moon = true; arms([-35, 24], [-145, 24]); await goFar(220); M.moon = false; mood('smug', 2); gesture([-30, 24], [-150, 24], 1200); await wait(900, g);
+      } else if (n === 'flip') {
+        mood('excited', 2); M.face = Math.random() < .5 ? 1 : -1; await wait(300, g); gesture([-115, 32], [-65, 32], 800); M.flip = { t0: performance.now(), ms: 700, dir: M.face }; await hop(M.x, M.y, g, 700, 120); M.flip = null;
+        M.sq = .6; mood('happy', 2); await say(pick(['ta-da!', 'stuck the landing.', 'ten points.']), 'say', g, 500);
+      } else if (n === 'mime') {
+        mood('curious', 3); await say(L('mime'), 'think', g, 300);
+        for (let i = 0; i < 8; i++) { gesture([180 - (i % 2) * 22, 30], [(i % 2) * 22, 30], 280); M.tilt = i % 2 ? 3 : -3; await wait(300, g); } M.tilt = 0;
+        if (!reduce) await hop(M.x, M.y, g, 450, 40);
+      } else if (n === 'mirror') {
+        const rc = $('#record').getBoundingClientRect(), cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2, q = nearTo(cx, cy, rc.width + 40); if (!q) return;
+        await goTo(q, g, true); M.face = cx >= M.x ? 1 : -1; M.tgt = { x: cx, y: cy }; mood('curious', 2); await wait(900, g);
+        for (const m2 of ['happy', 'smug', 'shy', 'angry', 'excited']) { mood(m2, 1.2); M.sq = .2; await wait(650, g); }
+        await say(L('mirror'), 'sly', g, 600);
+      } else if (n === 'boo') {
+        const q = reduce ? null : pickRest(); if (q) { await goTo(q, g, true); settleAt(q); }
+        mood('sleepy', 5); M.ot = 1; M.wt = .3; await wait(1100, g); M.ot = 0; M.sleep = 1; await wait(R(3200, 4800), g); M.sleep = 0;
+        mood('excited', 1.2); M.sq = .7; M.sp = 1; gesture([-115, 32], [-65, 32], 900); if (!reduce) await hop(M.x, M.y, g, 420, 70); await say(L('boo'), 'shout', g, 700);
+      } else if (n === 'guitar') {
+        M.dance = 10; mood('hyped', 3); chirp('guitar', 'shout', 1600); await wait(R(4200, 6000), g);
+      } else if (n === 'bow' || n === 'boss') {
+        mood('happy', 3); M.face = 1; if (n === 'boss') await say(L('boss'), 'say', g, 300);
+        for (let i = 0; i < 2; i++) { arms([-40, 26], [-140, 26]); M.tilt = 26 * M.face; await wait(850, g); M.tilt = 0; arms(...REST); await wait(450, g); }
+        await say(L('bow'), 'say', g, 400);
+      } else if (n === 'midnight') {
+        midnightDone = true; mood('dreamy', 4); M.nod = 1; await say(L('midnight'), 'think', g, 900); M.nod = 0;
+      } else if (n === 'idea') {
+        M.idea = 1.8; mood('surprised', 1.4); M.sq = .4; gesture([-60, 24], [-120, 24], 900); await say(L('idea'), 'shout', g, 700); await wait(400, g); mood('curious', 2);
+      } else if (n === 'belly') {
+        mood('surprised', 1); M.sq = .5; await say(L('belly'), 'sly', g, 400); M.dance = 7; mood('smug', 3); await wait(2200, g);
+      }
+    } finally { pr = false; M.moon = false; M.flip = null; M.dance = 0; M.sway = 0; M.nod = 0; M.tilt = 0; M.micT = 0; M.tgt = null; if (n === 'boo') M.sleep = 0; arms(...REST); }
+  }
+  on(window, 'keydown', (e) => {
+    lastKeyAt = performance.now(); const c = ctrlOf(e.target); if (c) focusAtt = { el: c, until: lastKeyAt + 4500 };
+    if (e.target.closest && e.target.closest('input,textarea')) return;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (guideOn && e.key === 'Escape') stopGuide();
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (key === '?' || key === 'h') { if (!guideOn) openGuide(); return; }
+    if (key === KON[kn]) { kn++; if (kn > 4 && key.startsWith('Arrow')) e.preventDefault(); if (kn === KON.length) { kn = 0; if (!tourOn && !pr) { queue.push({ k: 'egg', n: 'konami' }); interrupt(); } } }      // once ↑↑↓↓ is typed the next arrows belong to the code, not to the track skipper
+    else kn = key === KON[0] ? 1 : 0;
+    if (e.key.length === 1 && /[a-z]/i.test(e.key)) { word = (word + key).slice(-8); for (const w in WORDS) if (word.endsWith(w)) { word = ''; if (!tourOn && !pr) { queue.push({ k: 'egg', n: WORDS[w] }); interrupt(); } break; } }
+  }, { capture: true });
+
+  /* ── the interactive guide: it walks up to a control and points, you try it, “show me” if you want a demo; the ? button reopens it ── */
+  const GUIDE = [
+    { sel: '#power', t: 'motor switch', p: 'turn it on to spin the platter. the lamp lights up while it runs.',
+      base: () => ({ m: S.motor }), ok: (b) => S.motor !== b.m, demo: () => ({ done: () => api.setMotor(!S.motor) }) },
+    { sel: '#arm', pt: armPt, t: 'tonearm', p: 'press and hold the arm, carry it onto the record, let go. the rings are the gaps between songs: where the needle lands is what plays.',
+      base: () => ({ mode: S.arm.mode }), ok: (b) => { const m = S.arm.mode; if (m === 'held') b.held = 1; return !!(b.held || m !== b.mode) && (m === 'down' || m === 'parked') && !S.grab; },
+      demo: () => { const th0 = api.theta(), th1 = api.thetaFor(S.rec.index, S.rec.pos); return { pt: armPt, follow: true, minT: 1800, start: () => api.armStart(), progress: (p) => api.armMove(lerp(th0, th1, ease(p))), done: () => api.armDrop(), abort: () => api.armDrop() }; } },
+    { sel: '#lever', t: 'cue lever', p: 'lifts the needle off the record without moving it, and sets it back down. (it works once the needle is on the record.)',
+      base: () => ({ c: S.arm.cueRaised }), ok: (b) => S.arm.cueRaised !== b.c || b.hit('#lever'), demo: () => ({ track: $('#leverBody'), done: () => api.lever() }) },
+    { sel: '#volume', t: 'volume', p: 'turn the steel knob: drag around it, or use ← → when it is focused.',
+      base: () => ({ v: S.volume }), ok: (b) => Math.abs(S.volume - b.v) > .06,
+      demo: () => { const v0 = S.volume; return { progress: (p) => api.setVolume(p < .5 ? lerp(v0, .2, ease(p * 2)) : lerp(.2, v0, ease(p * 2 - 1))), done: () => api.setVolume(v0) }; } },
+    { sel: '#trim', t: 'speed trim', p: 'a small dial on the arm plate: nudge the speed by up to ±6%. it clicks back to 0.',
+      base: () => ({ t: S.trim }), ok: (b) => Math.abs(S.trim - b.t) > .1,
+      demo: () => { const t0 = S.trim; return { progress: (p) => api.setTrim(p < .5 ? lerp(t0, .6, ease(p * 2)) : lerp(.6, t0, ease(p * 2 - 1))), done: () => api.setTrim(t0) }; } },
+    { sel: '#record', t: 'the record', p: 'put a finger on it to slow or stop it. turn it either way, flick it, even play it backwards.',
+      base: () => ({}), ok: (b) => { if (S.hold && S.hold.active) b.seen = 1; return !!b.seen && !S.hold; } },
+    { sel: '.seek__knob', avoid: '.seek__bar', t: 'progress line', p: 'drag it to carry the needle to any spot in the song. it plays from wherever you let go.',
+      base: () => ({}), ok: (b) => b.hit('#seek'), demo: () => ({ avoid: '.seek__bar', done: () => api.cueTo(S.rec.index, (S.span[S.rec.index] || 60) * .55) }) },
+    { sel: () => { const d = $$('.dot'); return d[S.rec.index === d.length - 1 ? 0 : d.length - 1]; }, t: 'tracks', p: 'tap a dot or an arrow under the deck to change song.',
+      base: () => ({ i: S.rec.index }), ok: (b) => S.rec.index !== b.i || b.hit('.dot,.skip'), demo: () => ({ quick: true, done: () => api.skipTo(S.rec.index === S.tracks.length - 1 ? 0 : S.tracks.length - 1) }) },
+  ];
+  const HELP_LABEL = 'Open the guide: Static shows how each control works';
+  const helpBtn = Object.assign(document.createElement('button'), { className: 'mhelp', type: 'button', textContent: '?', title: 'guide' });
+  helpBtn.setAttribute('aria-label', HELP_LABEL);
+  const gpanel = Object.assign(document.createElement('section'), { className: 'mguide', hidden: true });
+  gpanel.setAttribute('role', 'dialog'); gpanel.setAttribute('aria-label', 'Quick guide'); gpanel.setAttribute('aria-live', 'polite');
+  gpanel.innerHTML = '<div class="mguide__top"><span class="mguide__n"></span><span class="mguide__dots"></span><button type="button" class="mguide__x" data-c="stop" aria-label="Close the guide">×</button></div><h3 class="mguide__t"></h3><p class="mguide__p"></p><p class="mguide__try"></p><div class="mguide__a"><button type="button" data-c="show">show me</button><button type="button" data-c="skip">skip</button></div>';
+  document.body.append(gpanel, helpBtn);
+  const gq = (c) => gpanel.querySelector('.mguide__' + c);
+  let guideOn = false, guideCmd = '', gTarget = null, guideStop = false;
+  const stopGuide = () => { if (!guideOn) return; guideCmd = 'stop'; guideStop = true; interrupt(); };        // works mid-walk too: it cancels the bot's current step
+  on(gpanel, 'click', (e) => { const b = e.target.closest && e.target.closest('[data-c]'); if (!b) return; if (b.dataset.c === 'stop') stopGuide(); else guideCmd = b.dataset.c; });
+  on(helpBtn, 'click', () => { if (guideOn) stopGuide(); else openGuide(); });
+  function placeGuide() {                         // the card goes wherever it covers the least (and never the control being explained)
+    if (gpanel.hidden) return; const w = gpanel.offsetWidth, h = gpanel.offsetHeight, m = 10, rs = rects().filter((k) => k.n !== 'guide');
+    const C = [[(innerWidth - w) / 2, m], [m, m], [innerWidth - w - m, m], [(innerWidth - w) / 2, innerHeight - h - m], [m, innerHeight - h - m], [innerWidth - w - m, innerHeight - h - m]];
+    const ov = (x, y, k) => Math.max(0, Math.min(x + w, k.r) - Math.max(x, k.l)) * Math.max(0, Math.min(y + h, k.b) - Math.max(y, k.t)); let best = C[0], bs = 1e18;
+    for (const [x0, y0] of C) {
+      const x = cl(x0, m, Math.max(m, innerWidth - w - m)), y = cl(y0, m, Math.max(m, innerHeight - h - m)); let sc = 0;
+      rs.forEach((k) => { sc += ov(x, y, k) * (k.n === 'deck' ? 1.4 : k.n ? .25 : 8); });
+      if (gTarget) sc += ov(x, y, { l: gTarget.left - 14, t: gTarget.top - 14, r: gTarget.right + 14, b: gTarget.bottom + 14 }) * 60;
+      if (sc < bs) { bs = sc; best = [x, y]; }
+    }
+    gpanel.style.transform = `translate(${best[0]}px,${best[1]}px)`;
+  }
+  function setPanel(i, total, st, hint) {
+    gpanel.hidden = false; gq('n').textContent = `${i + 1} / ${total}`; gq('dots').innerHTML = Array.from({ length: total }, (_, k) => `<i class="${k < i ? 'is-done' : k === i ? 'is-now' : ''}"></i>`).join('');
+    gq('t').textContent = st.t; gq('p').textContent = st.p; gq('try').textContent = hint; gpanel.querySelector('[data-c="show"]').hidden = !st.demo; placeGuide();
+  }
+  const pointAt = (el, st) => { const p = st.pt && st.pt(), r = p ? box(p.x - 1, p.y - 1, 2, 2) : el.getBoundingClientRect(), tx = r.left + r.width / 2, ty = r.top + r.height / 2; M.tgt = { x: tx, y: ty }; M.face = tx >= M.x ? 1 : -1; reach(tx, ty, 62); };
+  function openGuide() {
+    if (guideOn) return; hideChip(); if (M.sleep) wake(true);
+    queue.push({ k: gs.step > 0 && gs.step < GUIDE.length && !gs.done ? 'guideAsk' : 'guide' }); interrupt();
+  }
+  async function guideAsk(g) {
+    mood('happy', 2);
+    setChip(`pick up at step ${gs.step + 1}?`, [['continue', () => { hideChip(); queue.push({ k: 'guide', from: gs.step }); interrupt(); }], ['start over', () => { hideChip(); queue.push({ k: 'guide', from: 0 }); interrupt(); }]], 15000);
+  }
+  async function guide(g, from = 0) {
+    tourOn = true; guideOn = true; guideCmd = ''; guideStop = false; btn.classList.add('ghost'); hideChip(); helpBtn.classList.add('on'); helpBtn.textContent = '×'; helpBtn.setAttribute('aria-label', 'Close the guide');
+    let stopped = false, finished = false; const total = GUIDE.length;
+    try {
+      M.face = 1; mood('happy', 3); arms(null, [-62, 30]);
+      await say(from ? 'right. where were we…' : visitorName ? `okay ${visitorName}. i point, you try. deal?` : L('gOpen'), 'say', g, 400);
+      for (let i = from; i < total && !stopped; i++) {
+        const st = GUIDE[i], el = typeof st.sel === 'function' ? st.sel() : $(st.sel); if (!el) continue;
+        gs = { ...gs, step: i }; gset(gs);
+        const tr = () => { const p = st.pt && st.pt(); return p ? box(p.x - 26, p.y - 26, 52, 52) : el.getBoundingClientRect(); };
+        const fresh = () => { const b = st.base ? st.base() : {}; b.t0 = performance.now(); b.hit = (sel) => !!(lastDown && lastDown.t >= b.t0 && lastDown.el && lastDown.el.closest && lastDown.el.closest(sel)); return b; };
+        let b = fresh(); gTarget = tr(); setPanel(i, total, st, st.demo ? 'your turn: try it, or tap “show me”' : 'your turn: give it a go'); ringOn(gTarget);
+        await operate(el, g, { pointOnly: true, pt: st.pt, avoid: st.avoid });          // walks up beside it and points
+        gTarget = tr(); ringOn(gTarget); placeGuide();
+        let t0 = performance.now(), said = 0, res = '';
+        while (!res) {
+          await wait(130, g);
+          if (guideCmd) { res = guideCmd; guideCmd = ''; }
+          else if (st.ok(b)) res = 'done';
+          else { const idle = performance.now() - t0; if (idle > 22000 && said < 1) { said = 1; chirp('gIdle', 'say', 2400); } else if (idle > 70000 && said < 2) { said = 2; chirp('gLate', 'say', 2400); } else if (idle > 200000) res = 'stop'; }
+          if (res === 'show') {
+            if (st.demo) { M.tgt = null; await operate(el, g, { ...st.demo(), say: pick(['like this…', 'watch closely.', 'easy. look.']) }); pointAt(el, st); }
+            b = fresh(); t0 = performance.now(); said = 0; gTarget = tr(); ringOn(gTarget); res = '';
+          }
+        }
+        if (res === 'stop') { stopped = true; break; }
+        if (res === 'done') { mood('excited', 1.8); M.glad = 1; gesture([-115, 32], [-65, 32], 900); if (!reduce) M.sp = 1; hearts(); await say(L('gNice'), 'say', g, 200); }
+      }
+      if (!stopped) {
+        finished = true; gs = { ...gs, s: 'accepted', step: 0, done: 1 }; gset(gs); gpanel.hidden = true; ring.hidden = true; M.tgt = null; arms(...REST);
+        mood('happy', 3); M.dance = 1; await say(L('gDone'), 'say', g, 1800); M.dance = 0;
+      }
+    } finally {
+      tourOn = false; guideOn = false; btn.classList.remove('ghost'); gpanel.hidden = true; ring.hidden = true; M.tgt = null; M.sway = 0; M.dance = 0; arms(...REST);
+      helpBtn.classList.remove('on'); helpBtn.textContent = '?'; helpBtn.setAttribute('aria-label', HELP_LABEL);
+      if (stopped || finished || guideStop) { helpBtn.classList.add('nudge'); setTimeout(() => helpBtn.classList.remove('nudge'), 6000); }
+      else if (alive) queue.push({ k: 'guidePaused' });          // knocked off course (picked up, etc.): offer to carry on
+    }
   }
 
   /* ── frame: smooth everything, then write the SVG ── */
@@ -943,7 +1356,7 @@ export function initMascot(S, audio, api) {
     const dt = Math.min(.05, (now - T0) / 1000 || .016), t = now / 1000, k = 1 - Math.pow(.001, dt); T0 = now;
     const pl = !!(S.motor && S.arm.mode === 'down');
     if (pl !== playing) {
-      playing = pl; if (pl) { singSince = songSince = performance.now(); restDue = songSince + R(40000, 60000); }
+      playing = pl; if (pl) { singSince = songSince = performance.now(); restDue = songSince + R(40000, 60000); beat.newTrack(); if (M.sleep) wake(false, true); }
       if (!tourOn && !pr && !raging && !op && (M.mode === 'walk' || M.mode === 'jump')) {
         if (!pl) {
           const t0 = performance.now(), byUser = t0 - (S.userSkipAt || 0) < 1500, vibing = singSince && t0 - songSince > 2500;
@@ -953,15 +1366,29 @@ export function initMascot(S, audio, api) {
         interrupt();
       }
     }
-    if (S.rec.index !== lastIdx) { lastIdx = S.rec.index; songSince = performance.now(); if (skipHandled) skipHandled = false; else if (S.motor && welcomed && !tourOn && !pr) { queue.push({ k: 'track', title: S.tracks[lastIdx]?.title || 'this one' }); interrupt(); } }
+    if (S.rec.index !== lastIdx) { lastIdx = S.rec.index; songSince = performance.now(); beat.newTrack(); if (skipHandled) skipHandled = false; else if (S.motor && welcomed && !tourOn && !pr) { queue.push({ k: 'track', title: S.tracks[lastIdx]?.title || 'this one' }); interrupt(); } }
     modeStep(dt, t, k);
-    if (M.go) { const go = M.go; if (go.g !== gen) { M.go = null; go.rej('x'); } else { const p = go.path[go.i], dx = p.x - M.x, dy = p.y - M.y, d = Math.hypot(dx, dy), v = (reduce ? 400 : 210) * dt;
-      if (d <= Math.max(2, v)) { M.x = p.x; M.y = p.y; if (++go.i >= go.path.length) { M.go = null; go.res(); } } else { M.x += (dx / d) * v; M.y += (dy / d) * v; if (Math.abs(dx) > 1) M.face = dx > 0 ? 1 : -1; M.ph += dt * 13; M.sit = 0; } } }
+    if (M.go) { const go = M.go; if (go.g !== gen) { M.go = null; M.vel = 0; go.rej('x'); } else {
+      const p = go.path[go.i], dx = p.x - M.x, dy = p.y - M.y, d = Math.hypot(dx, dy); let rem = d; for (let i = go.i + 1; i < go.path.length; i++) rem += Math.hypot(go.path[i].x - go.path[i - 1].x, go.path[i].y - go.path[i - 1].y);
+      M.vel += ((reduce ? 400 : 210) * walkMul() * cl(rem / 46, .3, 1) - M.vel) * Math.min(1, dt * 8); const v = M.vel * dt;      // eases in from a standstill, slows down as it arrives
+      if (d <= Math.max(2, v)) { M.x = p.x; M.y = p.y; if (++go.i >= go.path.length) { M.go = null; M.vel = 0; go.res(); } }
+      else {
+        M.x += (dx / d) * v; M.y += (dy / d) * v;
+        if (Math.abs(dx) > 1) { M.face = (dx > 0 ? 1 : -1) * (M.moon ? -1 : 1); M.lean += ((dx > 0 ? 1 : -1) * cl(M.vel / 210, 0, 1.4) * 5 - M.lean) * Math.min(1, dt * 8); }     // leans into the walk
+        const ph0 = M.ph; M.ph += dt * 13 * cl(M.vel / 210, .35, 1.6) * (M.moon ? .45 : 1); M.sit = 0;                                                                      // stride rate follows speed: no skating
+        if (!M.moon && M.vel > 150 && Math.sin(M.ph) * Math.sin(ph0) < 0 && Math.random() < .4) dust({ x: M.x + R(-8, 8), y: M.y - 2 });                                      // a puff on some heel strikes
+      }
+    } } else { M.vel = 0; M.lean *= Math.exp(-dt * 8); }
     M.pop = Math.min(1, M.pop + dt * (reduce ? 20 : 2.6)); const pop = 1 + Math.sin(M.pop * Math.PI) * .12 * (M.pop < 1), sc = M.pop < 1 ? Math.min(1, M.pop * 1.6) : 1;
+    const bands = playing && audio.bands ? audio.bands() : null, lvRaw = playing && audio.level ? audio.level() : 0;
+    beat.update(now, dt, bands, lvRaw, playing && !M.sleep);
+    if (beat.beat) onBeat(); if (beat.drop) onDrop(); if (beat.judged) onJudged();
+    M.dph += dt * Math.PI * cl(beat.bpm || 92, 70, 150) / 60 * (playing ? ({ hype: 1, groove: 1, chill: .5, moody: .5 }[beat.mood] || 1) : .6);       // one hop per beat
+    const bpulse = playing && !M.sleep ? beat.pulse : 0; watchUser(now);
     const tb = torchBusy(), sing = isSinging(); let lv = 0;
     if (M.rest && !tb) { if (M.rest === 1) { M.ot = .14 + .12 * Math.abs(Math.sin(t * 3.2)); M.wt = .5; } }      // resting: no lip-sync, just catching breath
     else if (playing && !tb) {
-      lv = audio.level ? audio.level() : 0; if (lv < .02) lv = .22 + .2 * Math.abs(Math.sin(t * 7));
+      lv = lvRaw; if (lv < .02) lv = .22 + .2 * Math.abs(Math.sin(t * 7));
       if (sing) { const syl = Math.abs(Math.sin(t * 8.5 + Math.sin(t * 2.3) * 2)); M.ot = cl(.2 + syl * (.5 + lv * .4), .12, 1); M.wt = .3 + .45 * Math.abs(Math.sin(t * 5.3 + 1)); }     // real singing: the mouth opens and closes on every syllable, even in quiet bits
       else { M.ot = cl(lv * 1.7, .05, 1); M.wt = .45 + Math.sin(t * 9) * .3; }
     } else if (tb && !B) { M.ot = .06; M.wt = .5; }     // holding the torch: mouth stays shut, no lip-sync
@@ -970,19 +1397,23 @@ export function initMascot(S, audio, api) {
     M.mic = tb ? 0 : M.mic + ((M.micT ? 1 : 0) - M.mic) * k;
     // face: the current mood decides lids, brows, mouth curve and pupils; blinking is a lid, so every mood blinks in its own way
     M.mood.t = Math.max(0, M.mood.t - dt); M.nb -= dt; if (M.nb < 0) { M.bl = 1; M.nb = Math.random() < .2 ? .3 : R(2, 5); } M.bl = Math.max(0, M.bl - dt * 7);
-    const hx = M.x, hy = M.y - BH * .55, tg = M.tgt || (mx >= 0 ? { x: mx, y: my } : null); const lx = tg ? cl((tg.x - hx) / 180, -1, 1) * M.face : 0, ly = tg ? cl((tg.y - hy) / 180, -1, 1) : 0; M.lx += (lx - M.lx) * k; M.ly += (ly - M.ly) * k;
-    const F = faceTarget(); for (const key in F) FS[key] += (F[key] - FS[key]) * Math.min(1, dt * 7);
-    const cover = cl(FS.cover + Math.sin(M.bl * Math.PI) * (1 - FS.cover), 0, 1), ew = 1 + M.wide * .25;
+    const hx = M.x, hy = M.y - BH * .55, tg = M.tgt || attention(now), rawX = tg ? cl((tg.x - hx) / 180, -1, 1) : 0, lx = rawX * M.face, ly = tg ? cl((tg.y - hy) / 180, -1, 1) : 0;
+    if (Math.abs(lx - M.lx) + Math.abs(ly - M.ly) > .55 && M.bl === 0 && M.nb > .25) M.nb = .02;                                  // a big glance comes with a blink
+    M.sacc -= dt; if (M.sacc < 0) { M.sacc = R(.35, 1.7); M.sx = R(-.14, .14); M.sy = R(-.1, .1); }                                  // tiny eye darts: nobody stares perfectly still
+    M.lx += (lx + M.sx * (tg ? 1 : 1.6) - M.lx) * Math.min(1, k * 1.6); M.ly += (ly + M.sy - M.ly) * Math.min(1, k * 1.6); M.lookS += (rawX - M.lookS) * k; faceToward(tg, now);
+    const F = faceTarget(); for (const key in F) FS[key] += (F[key] - FS[key]) * Math.min(1, dt * (M.sleep ? 1.8 : 7));
+    const cover = cl(FS.cover + Math.sin(M.bl * Math.PI) * (1 - FS.cover) + M.ly * .09, 0, 1), ew = 1 + M.wide * .25;
     E.el.setAttribute('transform', `translate(34 46)scale(${ew})`); E.er.setAttribute('transform', `translate(66 46)scale(${ew})`);
     lids.forEach((l, i) => { l.setAttribute('height', (3.5 + cover * 27).toFixed(1)); l.setAttribute('transform', `rotate(${((i ? -1 : 1) * FS.tilt).toFixed(1)})`); }); los.forEach((l) => l.setAttribute('ry', (FS.low * 14).toFixed(1)));
-    pps.forEach((p, i) => { const sw = M.dizzy > 0 ? 2.5 : 0; p.setAttribute('rx', (4.9 * FS.pup).toFixed(2)); p.setAttribute('ry', (7 * FS.pup).toFixed(2)); p.setAttribute('cx', (M.lx * 3.6 + Math.cos(t * 9 + i * 2) * sw).toFixed(2)); p.setAttribute('cy', (M.ly * 4 + Math.sin(t * 9 + i * 2) * sw).toFixed(2)); });
+    pps.forEach((p, i) => { const sw = M.dizzy > 0 ? 2.5 : 0; p.setAttribute('rx', (4.9 * FS.pup * (1 + bpulse * .1)).toFixed(2)); p.setAttribute('ry', (7 * FS.pup * (1 + bpulse * .1)).toFixed(2)); p.setAttribute('cx', (M.lx * 3.6 + Math.cos(t * 9 + i * 2) * sw).toFixed(2)); p.setAttribute('cy', (M.ly * 4 + Math.sin(t * 9 + i * 2) * sw).toFixed(2)); });
     E.brs.setAttribute('opacity', cl(Math.abs(FS.brow) * 1.1 + Math.abs(FS.bt) / 22, 0, 1).toFixed(2)); E.bl.setAttribute('transform', `translate(0 ${(-FS.brow * 5).toFixed(2)})rotate(${FS.bt.toFixed(1)} 34 29)`); E.br.setAttribute('transform', `translate(0 ${(-FS.brow * 5).toFixed(2)})rotate(${(-FS.bt).toFixed(1)} 66 29)`);
     const mo = M.sleep ? .08 + Math.max(0, Math.sin(t * 1.4)) * .06 : M.o, md2 = mouthD(mo, M.w, FS.smile); E.mo.setAttribute('d', md2); E.mo2.setAttribute('d', md2); E.tg.setAttribute('opacity', (mo > .3 ? cl((mo - .3) * 2.2, 0, 1) : 0).toFixed(2)); E.tg.setAttribute('cy', (80 + mo * 8).toFixed(1));
     // arms + mic
-    const sw = Math.sin(t * 1.7) * 2.5, A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
+    const wk = M.go && !M.grip && !M.dance && !M.eff && !M.gs && !micHeld() ? cl(M.vel / 160, 0, 1) : 0, trail = wk * 9, wob = wk * Math.sin(M.ph) * 14;       // walking: arms trail a little and swing against each other
+    const sw = Math.sin(t * 1.7) * 2.5, A = (m, ln, hd, px, w, l2) => { m.a += (m.ta - m.a) * k; m.l += (m.tl - m.l) * k; const a = ((m.a + sw * w + trail + wob * w) * Math.PI) / 180, x = px + Math.cos(a) * m.l, y = 68 + Math.sin(a) * m.l; ln.setAttribute('x1', px); ln.setAttribute('y1', 68); ln.setAttribute('x2', x); ln.setAttribute('y2', y); l2.setAttribute('x1', px - 2); l2.setAttribute('y1', 66); l2.setAttribute('x2', x - 2); l2.setAttribute('y2', y - 2); hd.setAttribute('cx', x); hd.setAttribute('cy', y); return [x, y]; };
     A(M.L, E.al, E.hl, 12, 1, E.al2); const [hxr, hyr] = A(M.Rm, E.ar, E.hr, 88, -1, E.ar2);
     E.mc.setAttribute('transform', `translate(${hxr} ${hyr})rotate(${(-12 + (sing ? Math.sin(t * 6) * 5 : 0)).toFixed(1)})scale(${(1.45 * M.mic * (1 + (sing ? lv * .08 : 0))).toFixed(3)})`); E.mc.style.display = M.mic > .03 ? '' : 'none';
-    if (sing && now > noteT) { noteT = now + R(340, 640); notes(); }     // a note every beat or so, every time the mic is out
+    if (sing && now > noteT) { noteT = now + R(560, 980); notes(); }     // a note every beat or so, every time the mic is out
     E.fg.style.display = M.fing ? '' : 'none'; if (M.fing) E.fg.setAttribute('transform', `translate(${hxr} ${hyr})scale(1.3)rotate(${(Math.sin(now / 45) * 6).toFixed(1)})`);     // the middle finger: big, and it trembles with rage
     chalk.classList.toggle('on', !!chalkAim);
     if (chalkAim) {
@@ -1003,11 +1434,26 @@ export function initMascot(S, audio, api) {
     } else if (rig.classList.contains('on') || spot.classList.contains('lit')) {
       rig.classList.remove('on', 'lit'); spot.classList.remove('lit');
     }
-    E.an.setAttribute('transform', `rotate(${Math.sin(t * 3) * 5 + lv * 14 + (M.sleep ? 14 : 0)} 34 12)`); E.bu.setAttribute('opacity', M.sleep ? .15 : playing ? .35 + lv : .55 + Math.sin(t * 2) * .35);
+    E.an.setAttribute('transform', `rotate(${(Math.sin(t * 3) * 5 + lv * 14 + bpulse * 12 * M.bdir + (M.sleep ? 14 : 0)).toFixed(2)} 34 12)`); M.idea = Math.max(0, M.idea - dt);
+    E.bu.setAttribute('opacity', M.idea > 0 ? 1 : cl(M.sleep ? .15 : playing ? .35 + lv + bpulse * .35 : .55 + Math.sin(t * 2) * .35, 0, 1).toFixed(2));
+    E.bhalo.setAttribute('opacity', M.idea > 0 ? (cl(M.idea * 1.6, 0, 1) * (.65 + .35 * Math.sin(t * 28))).toFixed(2) : (bpulse * .35).toFixed(2));
     // body
-    const walk = !!M.go, hop = walk ? Math.abs(Math.sin(M.ph)) * 5 : M.dance || M.run ? Math.abs(Math.sin(t * 9)) * (4 + 10 * (playing ? Math.max(.3, lv) : .7)) : 0, bob = hop + (playing ? lv * 3 : Math.sin(t * (M.sleep ? 1.2 : 2)) * (M.sleep ? 1.6 : .8)) + (M.sit && !walk ? 4 : 0) + (M.sleep ? 5 : 0), fx = Math.cos((1 - M.sp) * TAU);
-    E.bd.setAttribute('transform', `rotate(${M.rot} 50 84)translate(50 118)scale(${M.face * (M.sp ? fx : 1) * sc * pop} ${sc * pop * (1 + (walk ? Math.sin(M.ph * 2) * .03 : Math.sin(t * 2) * .012))})translate(-50 -118)translate(0 ${-bob})`);
-    const sw2 = walk ? Math.sin(M.ph) * 4 : M.mode === 'held' || M.struggle || M.run ? Math.sin(t * 24) * 7 : M.sit ? Math.sin(t * 3) * 2 : 0; E.fl.setAttribute('cy', 113 + sw2); E.fr.setAttribute('cy', 113 - sw2); E.sh.setAttribute('opacity', .5 * sc);
+    const walk = !!M.go, sit = M.sit && !walk, stride = walk ? Math.sin(M.ph) : 0;
+    const hop = walk ? (M.moon ? 0 : Math.abs(stride) * 5 * cl(M.vel / 140, .3, 1.3)) : M.dance || M.run ? Math.abs(Math.sin(M.dph)) * (4 + 10 * (playing ? Math.max(.3, lv) : .7)) : 0;
+    const beatBob = playing && !M.sleep && !M.rest ? bpulse * (M.dance ? 2.5 : sit ? 1.6 : 2.2) : 0;
+    const bob = hop + beatBob + (playing ? lv * 3 : Math.sin(t * (M.sleep ? 1.2 : 2)) * (M.sleep ? 1.6 : .8)) + (sit ? 4 : 0) + (M.sleep ? 5 : 0), fx = Math.cos((1 - M.sp) * TAU);
+    let flipA = 0; if (M.flip) { const p = (now - M.flip.t0) / M.flip.ms; if (p >= 1) M.flip = null; else flipA = ease(p) * 360 * -M.flip.dir; }
+    const breath = M.sleep ? Math.sin(t * 1.15) * .028 : Math.sin(t * 2) * .012, headBeat = bpulse * M.bdir * (M.dance ? 2.5 : 3.2);
+    E.bd.setAttribute('transform', `rotate(${(M.rot + flipA + headBeat).toFixed(2)} 50 84)translate(50 118)scale(${M.face * (M.sp ? fx : 1) * sc * pop} ${sc * pop * (1 + (walk ? Math.sin(M.ph * 2) * .03 : breath))})translate(-50 -118)translate(0 ${-bob})`);
+    // feet: heel-to-toe strides while walking, legs dangling while sitting; the shadow stays on the floor and shrinks when the bot is in the air
+    const dang = Math.sin(t * 2.6), sw2 = walk ? stride * 4 : M.mode === 'held' || M.struggle || M.run ? Math.sin(t * 24) * 7 : sit ? dang * 3.2 : 0;
+    E.fl.setAttribute('cy', (113 + sw2).toFixed(2)); E.fr.setAttribute('cy', (113 - sw2).toFixed(2));
+    E.fl.setAttribute('cx', (35 + (walk ? Math.cos(M.ph) * 3.2 : sit ? -dang * 1.2 : 0)).toFixed(2)); E.fr.setAttribute('cx', (65 + (walk ? -Math.cos(M.ph) * 3.2 : sit ? dang * 1.2 : 0)).toFixed(2));
+    E.fl.setAttribute('ry', (6.5 - (walk ? Math.max(0, -stride) * 1.3 : 0)).toFixed(2)); E.fr.setAttribute('ry', (6.5 - (walk ? Math.max(0, stride) * 1.3 : 0)).toFixed(2));
+    const u1 = size / 140, airU = M.air / u1 + (sit || M.sleep ? 0 : bob), lift = cl(airU / 80, 0, 1), sqz = 1 + M.sq * .18;
+    E.sh.setAttribute('cx', (53 + lift * 3).toFixed(1)); E.sh.setAttribute('cy', (118 + M.air / u1).toFixed(1)); E.sh.setAttribute('rx', (32 * (1 - lift * .4) * sqz).toFixed(1)); E.sh.setAttribute('ry', (5.5 * (1 - lift * .3)).toFixed(2)); E.sh.setAttribute('opacity', (.5 * sc * (1 - lift * .65)).toFixed(2));
+    E.sh0.setAttribute('cy', (117 + M.air / u1).toFixed(1)); E.sh0.setAttribute('rx', (17 * (1 - lift * .55) * sqz).toFixed(1)); E.sh0.setAttribute('opacity', (.6 * sc * (1 - lift * .9)).toFixed(2));
+    if (M.sleep && now > zT) { zT = now + R(1900, 2800); zzz(); }
     const jx = (M.eff ? Math.sin(t * 55) * 1.4 * M.eff : raging ? Math.sin(t * 40) * 2 : 0) + (M.shake > 0 ? Math.sin(t * 50) * 1.3 : 0), mk = Math.round(Math.min(1.5, M.mad) * 20), key = mk * 100 + Math.round(M.mon * 10) * 10 + Math.round(M.pet * 5);
     if (key !== lastF) { lastF = key; const v = mk / 20; btn.style.filter = v > .02 || M.mon > .3 ? `hue-rotate(${-24 * v}deg) saturate(${1 + 1.5 * v}) brightness(${1 + .1 * v})${M.mon > .3 ? ' drop-shadow(0 0 12px rgba(255,70,40,.85))' : ''}` : ''; btn.style.setProperty('--bl', (.35 + .5 * M.pet + .25 * Math.min(1, M.mad)).toFixed(2)); E.mnst.setAttribute('opacity', M.mon.toFixed(2)); }
     const big = 1 + .28 * M.mon; btn.style.transform = `translate3d(${M.x - size / 2 + jx}px,${M.y - 0.943 * size}px,0)scale(${(1 + M.sq * .18) * big},${(1 - M.sq * .28) * big})`;
@@ -1015,7 +1461,7 @@ export function initMascot(S, audio, api) {
   }
 
   /* ── wiring ── */
-  const wake = (quiet) => { if (!M.sleep) return; M.sleep = 0; hide(); mood('surprised', 1.4); M.sq = .6; M.nod = 0; if (!quiet) queue.unshift({ k: 'wake' }); interrupt(); };   // touching it wakes it at once, face included
+  const wake = (quiet, soft) => { if (!M.sleep) return; M.sleep = 0; hide(); if (soft) mood('sleepy', 2.4); else { mood('surprised', 1.4); M.sq = .6; } M.nod = 0; if (!quiet) queue.unshift({ k: 'wake', soft: !!soft }); interrupt(); };   // touching it wakes it at once, face included
   const activity = () => { idleAt = performance.now(); wake(); };
   const grab = () => { wake(true); interrupt(); M.go = null; M.jp = null; M.dc = null; M.grip = null; M.mode = 'held'; M.micT = 0; M.peak = 0; M.petting = 0; btn.classList.add('held'); setTimeout(() => { if (M.mode === 'held') { show(L('scared'), 'shout'); tt.textContent = B.text; gg.textContent = ''; speechUntil = performance.now() + 2600; } }, 90); };
   let pt = 0;
@@ -1038,6 +1484,7 @@ export function initMascot(S, audio, api) {
   const drop = (e, cancel) => {
     if (!drag || e.pointerId !== drag.id) return; const d = drag; drag = null; clearTimeout(pt); M.petting = 0; btn.classList.remove('held');
     if (!d.moved) {
+      const eg = !cancel && !d.pet && !tourOn && !raging && !reduce ? bodyTap(e) : ''; if (eg) { queue.push({ k: 'egg', n: eg }); interrupt(); return; }       // antenna bulb x3 / tummy button x2
       if (!cancel && !d.pet && !tourOn && !raging) { const now = performance.now(), gap = now - lastTapAt, hard = gap < 750; lastTapAt = now; M.mad = Math.min(1.7, M.mad + (hard ? .3 : gap < 1800 ? .14 : .05)); queue.push(M.mad >= 1 ? { k: 'tantrum' } : { k: 'tap', hard }); interrupt(); }   // rapid taps hurt; too many and it snaps
       return;
     }
@@ -1049,9 +1496,16 @@ export function initMascot(S, audio, api) {
   on(btn, 'pointerup', (e) => drop(e, false)); on(btn, 'pointercancel', (e) => drop(e, true));
   on(btn, 'click', (e) => { if (e.detail === 0 && !tourOn) { queue.push({ k: 'tap' }); interrupt(); } });
   on(document, 'pointerdown', (e) => { activity(); if (curious && e.target.closest && e.target.closest('#deckFit')) interrupt(); if (e.target.closest && e.target.closest('.stm,.mchip,.mname,.mname-doodle,button,[role],a,#deckFit') || tourOn || reduce || performance.now() < pokeAt || Math.random() > .3) return; pokeAt = performance.now() + 14000; queue.push({ k: 'poke', x: e.clientX, y: e.clientY }); interrupt(); }, { capture: true });
-  on(window, 'pointermove', (e) => { if (e.pointerType === 'mouse') { mx = e.clientX; my = e.clientY; } idleAt = performance.now(); if (M.sleep) activity(); });
+  let jx = 0, jy = 0, jt = 0, jd = 0;
+  on(window, 'pointermove', (e) => {
+    const now = performance.now();
+    if (e.pointerType === 'mouse') { mx = e.clientX; my = e.clientY; lastMouseAt = now; tickle(e); } else touchPt = { x: e.clientX, y: e.clientY, why: 'touch', t: now };
+    idleAt = now;
+    if (M.sleep) { if (now - jt > 700) jd = 0; jt = now; jd += Math.hypot(e.clientX - jx, e.clientY - jy); if (jd > 220) { jd = 0; wake(false, true); } }     // a sleeping bot ignores a twitch of the mouse, not a real wave
+    jx = e.clientX; jy = e.clientY;
+  });
   on(window, 'keydown', () => { activity(); if (curious) interrupt(); }); on(window, 'scroll', activity, { passive: true });
-  let rt = 0; on(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { measure(); if (M.mode === 'walk' && !op && !raging && !curious && (hit(M.x, M.y, rects()) || !inV(M.x, M.y))) { const s = spots(rects()); if (s.length) { const p = pick(s); M.x = p.x; M.y = p.y; interrupt(); } } }, 160); });
+  let rt = 0; on(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { measure(); placeGuide(); if (M.mode === 'walk' && !op && !raging && !curious && (hit(M.x, M.y, rects()) || !inV(M.x, M.y))) { const s = spots(rects()); if (s.length) { const p = pick(s); M.x = p.x; M.y = p.y; interrupt(); } } }, 160); });
   const settle = setInterval(() => { if (!M.go && !M.sleep && M.mode === 'walk' && !tourOn && !curious && !op && !raging && !writingDoodle && !M.grip && hit(M.x, M.y, rects())) { const s = spots(rects()); if (s.length) { queue.unshift({ k: 'move', ...pick(s) }); interrupt(); } } }, 800);
   const watch = setInterval(() => {       // watchdog: no mode, flag or loop can stay stuck
     const now = performance.now(); if (M.mode !== wLast) { wLast = M.mode; wSince = now; }
@@ -1059,6 +1513,7 @@ export function initMascot(S, audio, api) {
     if (M.mode !== 'walk' && now - wSince > (M.mode === 'disc' ? 40000 : 15000)) { M.mode = 'fall'; M.dc = null; M.jp = null; M.vx = M.vy = 0; interrupt(); }
     if (M.go && now - M.go.t0 > 16000) interrupt();
     if (torchInProgress && now - torchStartedAt > 22000) interrupt();
+    if (M.sleep && (playing || tourOn)) wake(false, true);
     if (!torchInProgress && (torchAim || torchLit)) { torchAim = null; torchLit = false; $('.engrave')?.classList.remove('torch-lit'); }
     if (!op && M.grip) M.grip = null; if (!op && !raging && M.eff) M.eff = 0;
     if (!tourOn && !op && !ring.hidden && now - ringAt > 15000) ring.hidden = true;
@@ -1069,6 +1524,6 @@ export function initMascot(S, audio, api) {
 
   measure(); const sp = spots(rects()), home = sp.find((s) => s.kind === 'home'), s0 = (home && Math.random() < .5 ? home : pick(sp.filter((s) => s.kind !== 'home')) || home) || { x: innerWidth / 2, y: innerHeight - 12 };
   M.x = s0.x; M.y = s0.y; M.sit = s0.kind === 'edge' ? 1 : 0; btn.classList.add('on'); requestAnimationFrame(frame); setTimeout(loop, reduce ? 300 : 1100);
-  if (location.search.includes('debug')) window.__static = { M, get pr() { return pr; }, setIdle: (ms) => { idleAt = performance.now() - ms; interrupt(); }, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, queue, interrupt, chip, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, doodle: () => { born = performance.now() - 60000; nextDoodleAt = 0; interrupt(); }, hit, BW: () => BW, BH: () => BH };
-  return () => { mq.remove(); chip.remove(); namePanel.remove(); nameDoodle.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearInterval(watch); clearTimeout(ht); clearTimeout(doodleFadeTimer); clearTimeout(doodleHideTimer); btn.remove(); bub.remove(); ring.remove(); rig.remove(); spot.remove(); $('.engrave')?.classList.remove('torch-lit'); };
+  if (location.search.includes('debug')) window.__static = { M, get pr() { return pr; }, setIdle: (ms) => { idleAt = performance.now() - ms; interrupt(); }, get raging() { return raging; }, get op() { return op; }, get curious() { return curious; }, queue, interrupt, chip, get tourOn() { return tourOn; }, get bub() { return B; }, rects, spots, say, get playing() { return playing; }, doodle: () => { born = performance.now() - 60000; nextDoodleAt = 0; interrupt(); }, hit, BW: () => BW, BH: () => BH, beat, egg: (n) => { queue.push({ k: 'egg', n }); interrupt(); }, openGuide, gpanel, get guideOn() { return guideOn; }, GUIDE, attention: () => attention(performance.now()), restSpots, pickRest };
+  return () => { gpanel.remove(); helpBtn.remove(); chip.remove(); namePanel.remove(); nameDoodle.remove(); D.el?.remove(); alive = false; interrupt(); ac.abort(); clearInterval(settle); clearInterval(watch); clearTimeout(ht); clearTimeout(doodleFadeTimer); clearTimeout(doodleHideTimer); btn.remove(); bub.remove(); ring.remove(); rig.remove(); spot.remove(); $('.engrave')?.classList.remove('torch-lit'); };
 }

@@ -1,7 +1,42 @@
 {
   "tracks": [
-    { "filename": "song1.m4a", "title": "Hoor", "artist": "Sama, Starboy X", "duration": 158 },
-    { "filename": "song2.mp3", "title": "Tu", "artist": "Talwiinder", "duration": 132 },
-    { "filename": "song3.m4a", "title": "Safar", "artist": "Juss × MixSingh", "duration": 197 }
+    {
+      "filename": "song1.m4a",
+      "title": "Hoor",
+      "artist": "Sama, Starboy X",
+      "duration": 158
+    },
+    {
+      "filename": "song2.mp3",
+      "title": "Tu",
+      "artist": "Talwiinder",
+      "duration": 132
+    },
+    {
+      "filename": "song3.m4a",
+      "title": "Safar",
+      "artist": "Juss × MixSingh",
+      "duration": 197
+    },
+    {
+      "filenames": [
+        "song4.mp3",
+        "song4.m4a"
+      ],
+      "filename": "song4.mp3",
+      "title": "Rooh",
+      "artist": "Tej Gill",
+      "duration": 208
+    },
+    {
+      "filenames": [
+        "song5.mp3",
+        "song5.m4a"
+      ],
+      "filename": "song5.mp3",
+      "title": "Deewane",
+      "artist": "Navaan Sandhu",
+      "duration": 206
+    }
   ]
 }

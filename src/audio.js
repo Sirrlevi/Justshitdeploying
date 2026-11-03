@@ -52,7 +52,7 @@ export class DeckAudio {
       this.gain = this.ctx.createGain();
       this.gain.gain.value = this.volume * this.volume;
       this.node.connect(this.gain).connect(this.ctx.destination);
-      this.an = this.ctx.createAnalyser(); this.an.fftSize = 512; this.node.connect(this.an); this.abuf = new Uint8Array(this.an.fftSize);   // passive tap for the mascot's lip-sync
+      this.an = this.ctx.createAnalyser(); this.an.fftSize = 1024; this.an.smoothingTimeConstant = 0.3; this.node.connect(this.an); this.abuf = new Uint8Array(this.an.fftSize); this.fbuf = new Float32Array(this.an.frequencyBinCount);   // passive tap for the mascot's lip-sync
       this.node.port.onmessage = (e) => { const m = e.data; if (m.type === 'pos' && m.seq === this.seq) this.onEvent(m); };
       if (this.ctx.state === 'suspended') await this.ctx.resume().catch(() => {});
       this.mode = 'worklet';
@@ -139,6 +139,18 @@ export class DeckAudio {
     this.an.getByteTimeDomainData(this.abuf);
     let s = 0; for (let i = 0; i < this.abuf.length; i++) { const v = (this.abuf[i] - 128) / 128; s += v * v; }
     return Math.min(1, Math.sqrt(s / this.abuf.length) * 3.4);
+  }
+  /* bass / mid / high energy from the same passive tap, for the mascot's beat tracker; null without an analyser.
+     Linear amplitude (x10, unclipped) from the float spectrum: the byte spectrum clips on loud bass and hides the kicks. */
+  bands() {
+    if (!this.an) return null;
+    this.an.getFloatFrequencyData(this.fbuf);
+    const hz = this.ctx.sampleRate / this.an.fftSize, avg = (lo, hi) => {
+      const a = Math.max(0, Math.floor(lo / hz)), b = Math.min(this.fbuf.length - 1, Math.max(a, Math.ceil(hi / hz)));
+      let s = 0; for (let i = a; i <= b; i++) s += Math.pow(10, this.fbuf[i] / 10);
+      return Math.sqrt(s / (b - a + 1)) * 10;
+    };
+    return { bass: avg(40, 200), mid: avg(200, 2200), high: avg(2200, 8000) };
   }
   setVolume(v) {
     this.volume = v;
