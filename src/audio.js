@@ -73,15 +73,16 @@ export class DeckAudio {
 
   isReady(i) { return this.mode === 'element' || this.done.has(i); }
 
-  /* decode a track and hand it to the worklet; resolves to its duration in seconds (0 if unknown) */
-  ensure(i) {
+  /* decode a track and hand it to the worklet; resolves to its duration in seconds (0 if unknown).
+     `urgent` is the track the visitor is waiting for: it gets the network first (neighbours are fetched at low priority, one after the other) */
+  ensure(i, urgent = true) {
     if (i < 0 || i >= this.tracks.length) return Promise.resolve(0);
     if (this.loaded.has(i)) return this.loaded.get(i);
     const job = (async () => {
       await this.unlock();
       if (this.mode !== 'worklet') return 0;
       try {
-        const res = await fetch(this.tracks[i].url);
+        const res = await fetch(this.tracks[i].url, { priority: urgent ? 'high' : 'low' });
         const buf = await this.ctx.decodeAudioData(await res.arrayBuffer());
         const l = await toInt16(buf.getChannelData(0));
         const r = buf.numberOfChannels > 1 ? await toInt16(buf.getChannelData(1)) : l.slice();
@@ -109,7 +110,12 @@ export class DeckAudio {
         this.loaded.delete(k); this.done.delete(k);
       }
     }
-    [i, i + 1, i - 1].forEach((k) => this.ensure(k));
+    // the song you are on first, then the next one, then the previous one: loading all three at once used to make the current song compete with its own neighbours for the connection (the 5-8 MB tracks took ages on a phone)
+    const mine = (this._near = (this._near || 0) + 1);
+    this.ensure(i).then(() => {
+      if (mine !== this._near || this.mode !== 'worklet') return;
+      return this.ensure(i + 1, false).then(() => { if (mine === this._near && this.mode === 'worklet') this.ensure(i - 1, false); });
+    });
   }
 
   select(index, pos) {

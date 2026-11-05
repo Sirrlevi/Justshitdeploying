@@ -473,33 +473,7 @@ a{color:inherit}
 @keyframes mdust{to{transform:translate(var(--dx),var(--dy)) scale(.25);opacity:0}}
 @media (prefers-reduced-motion:reduce){.mdust{display:none}}
 
-/* ───────── Static v2: help button, interactive guide card, sleeping z's ───────── */
-.mhelp{position:fixed;z-index:60;top:max(10px,calc(env(safe-area-inset-top,0px) + 10px));right:max(10px,calc(env(safe-area-inset-right,0px) + 10px));width:34px;height:34px;display:grid;place-items:center;padding:0;border-radius:50%;background:#f4ecd9;border:2px solid #1d140e;box-shadow:0 3px 0 rgba(0,0,0,.35);color:#2a1b12;font:italic 700 17px/1 Lora,Georgia,serif;cursor:pointer;opacity:.8;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:opacity .2s,transform .12s,box-shadow .12s}
-.mhelp:hover,.mhelp:focus-visible,.mhelp.on{opacity:1}
-.mhelp:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
-.mhelp.nudge{opacity:1;animation:mhelp 1.4s ease-in-out 4}
-@keyframes mhelp{0%,100%{box-shadow:0 3px 0 rgba(0,0,0,.35),0 0 0 0 rgba(217,180,122,0)}50%{box-shadow:0 3px 0 rgba(0,0,0,.35),0 0 0 9px rgba(217,180,122,.5)}}
-
-.mguide{position:fixed;left:0;top:0;z-index:62;width:min(320px,calc(100vw - 20px));padding:10px 13px 12px;border:1px solid rgba(72,48,27,.26);border-radius:17px;background:linear-gradient(145deg,#fff9e9,#eee0c2);box-shadow:0 9px 26px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.8);color:#2a1b12;font-family:Lora,Georgia,serif;animation:mpop .22s cubic-bezier(.3,1.6,.5,1)}
-.mguide[hidden]{display:none}
-.mguide__top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.mguide__n{font:700 10.5px/1 system-ui,sans-serif;letter-spacing:.06em;color:#88775e}
-.mguide__dots{display:flex;gap:4px;flex:1;align-items:center}
-.mguide__dots i{display:block;width:6px;height:6px;border-radius:50%;background:rgba(72,48,27,.2);transition:background .2s,transform .2s}
-.mguide__dots i.is-done{background:#b58d55}
-.mguide__dots i.is-now{background:#2a1b12;transform:scale(1.3)}
-.mguide__x{width:28px;height:28px;margin:-4px -6px -4px 0;border-radius:50%;font:400 20px/1 system-ui,sans-serif;color:#77654e;cursor:pointer}
-.mguide__x:hover{background:rgba(72,48,27,.1)}
-.mguide__t{margin:0 0 2px;font:italic 700 15px/1.25 Lora,Georgia,serif}
-.mguide__p{margin:0;font:500 12.5px/1.45 Lora,Georgia,serif;color:#3b2a1c}
-.mguide__try{margin:7px 0 0;font:700 10.5px/1.2 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#8b673d}
-.mguide__a{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
-.mguide__a button{min-height:32px;padding:5px 14px;border-radius:999px;font:700 12px system-ui,sans-serif;cursor:pointer;background:#d9b47a;color:#1d140e;box-shadow:inset 0 1px 0 rgba(255,255,255,.42)}
-.mguide__a button+button{background:transparent;color:#6b5a48;box-shadow:none}
-.mguide__a button[hidden]{display:none}
-.mguide button:focus-visible,.mhelp:focus-visible{outline:2px solid #8b673d;outline-offset:2px}
-
+/* ───────── Static v2: sleeping z's ───────── */
 .mz{position:fixed;z-index:40;pointer-events:none;font:italic 700 16px/1 Lora,Georgia,serif;color:#cdd7ea;text-shadow:0 1px 5px rgba(0,0,0,.7);opacity:0;animation:mz 3.2s ease-out forwards}
 @keyframes mz{0%{opacity:0;transform:translate(0,0) scale(.6)}18%{opacity:.95}100%{opacity:0;transform:translate(var(--dx,14px),-48px) scale(1.3) rotate(8deg)}}
-@media (prefers-reduced-motion:reduce){.mz{display:none}.mhelp.nudge{animation:none}.mguide{animation:none}}
-.stm.ghost{pointer-events:none}        /* while the guide waits for you, the bot never blocks a control it stands beside */
+@media (prefers-reduced-motion:reduce){.mz{display:none}}

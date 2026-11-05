@@ -1,0 +1,10 @@
+# Songs are big and never change under the same name: let the browser (and Cloudflare) keep them,
+# so a song the visitor already heard starts instantly the next time.
+/songs/*.mp3
+  Cache-Control: public, max-age=604800
+/songs/*.m4a
+  Cache-Control: public, max-age=604800
+/songs/songs.json
+  Cache-Control: no-cache
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
