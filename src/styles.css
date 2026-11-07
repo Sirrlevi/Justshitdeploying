@@ -299,15 +299,20 @@ a{color:inherit}
 .hint.show{opacity:.9}
 .foot{top:max(calc(1412 * var(--u)),calc(1192 * var(--u) + 108px));left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:calc(22 * var(--u))}
 .tagline{margin:0;font-style:italic;font-size:max(13.5px,calc(26 * var(--u)));color:#cdc1a9;letter-spacing:.04em}
-.links{display:flex;align-items:center}
+.links{display:flex;align-items:center;justify-content:center;gap:max(16px,calc(36 * var(--u)))}
+/* icons: hairline engravings in a thin brass ring, same stroke language as the track arrows */
 .links a{
-  --sep:max(24px,calc(54 * var(--u)));position:relative;font-size:max(13px,calc(23 * var(--u)));color:#b4a78d;text-decoration:none;letter-spacing:.07em;padding:.55rem 0;
-  background:linear-gradient(currentColor,currentColor) 0 calc(100% - .4rem)/0 1px no-repeat;
-  transition:color .3s var(--ease),background-size .4s var(--ease);
+  position:relative;display:grid;place-items:center;
+  width:max(46px,calc(70 * var(--u)));height:max(46px,calc(70 * var(--u)));border-radius:50%;
+  color:#b4a78d;text-decoration:none;
+  background:radial-gradient(circle at 50% 32%,rgba(236,227,208,.07),rgba(236,227,208,0) 70%);
+  box-shadow:inset 0 0 0 1px rgba(205,191,163,.2),0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(0,0,0,.45);
+  transition:color .3s var(--ease),box-shadow .35s var(--ease),background-color .3s var(--ease),transform .3s var(--ease);
 }
-.links a+a{margin-left:var(--sep)}
-.links a+a::before{content:"·";position:absolute;left:calc(var(--sep) / -2 - .15em);color:#6d6350}
-.links a:hover,.links a:focus-visible{color:#eadfc9;background-size:100% 1px}
+.links svg{width:max(24px,calc(37 * var(--u)));height:max(24px,calc(37 * var(--u)));fill:none;stroke:currentColor;stroke-width:1.15;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+.links svg .fill{fill:currentColor;stroke:none}
+.links a:hover,.links a:focus-visible{color:#f0e5ce;box-shadow:inset 0 0 0 1px rgba(232,201,143,.55),0 0 calc(18 * var(--u)) rgba(255,214,150,.22),0 calc(6 * var(--u)) calc(16 * var(--u)) rgba(0,0,0,.45)}
+.links a:active{transform:scale(.94)}
 
 /* ───────── tone: walnut, vinyl and strobe ring taken from the photographic reference ───────── */
 .plinth{border-radius:calc(5 * var(--k))}

@@ -30,7 +30,7 @@ Everything in `public/` is served from the site root (`public/songs/…` → `/s
 ## Make it yours
 
 - The engraving bottom-left is plain text: `<p class="engrave">` in `index.html`.
-- The tagline and links are in the `<footer class="caption">` block of `index.html`.
+- The tagline and links are in the `<footer class="caption">` block of `index.html`. Each link is an `<a>` holding an inline SVG icon (hairline, 24×24, `currentColor`); to add or remove one, copy/delete an `<a>` inside `<nav class="links">`. Ring, size and hover glow are `.links a` in `styles.css`.
 
 ## Run / build
 
