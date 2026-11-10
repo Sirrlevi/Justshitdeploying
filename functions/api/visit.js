@@ -20,7 +20,7 @@ function limitedNumber(value,min,max) {
 }
 function envCredentials(env) {
   return {
-    token: clean(env.TELEGRAM_BOT_TOKEN,200),
+    token: String(env.TELEGRAM_BOT_TOKEN ?? "").trim(),
     chatId: clean(env.TELEGRAM_CHAT_ID,120)
   };
 }
@@ -40,10 +40,19 @@ export async function onRequestGet({request,env}) {
   if(!token||!chatId) return json({ok:false,function:"deployed",tokenConfigured:!!token,chatIdConfigured:!!chatId,stage:"cloudflare_secrets"});
   try {
     const me=await telegramCall(token,"getMe");
-    if(!me.response.ok||!me.result?.ok) return json({
-      ok:false,function:"deployed",tokenConfigured:true,chatIdConfigured:true,botApi:false,
-      stage:"bot_token",detail:clean(me.result?.description||"Telegram rejected the bot token",180)
-    });
+    if(!me.response.ok||!me.result?.ok) {
+      const rawToken=String(env.TELEGRAM_BOT_TOKEN ?? "");
+      const normalizedToken=rawToken.trim();
+      return json({
+        ok:false,function:"deployed",tokenConfigured:true,chatIdConfigured:true,botApi:false,
+        stage:"bot_token",detail:clean(me.result?.description||"Telegram rejected the bot token",180),
+        tokenLength:normalizedToken.length,
+        tokenFormatLooksValid:/^\d{5,15}:[A-Za-z0-9_-]{20,}$/.test(normalizedToken),
+        tokenHasOuterWhitespace:rawToken!==normalizedToken,
+        tokenHasInternalWhitespace:/\s/.test(normalizedToken),
+        tokenHasBotPrefix:/^bot\s/i.test(normalizedToken)
+      });
+    }
     const chat=await telegramCall(token,"getChat",{chat_id:chatId});
     if(!chat.response.ok||!chat.result?.ok) return json({
       ok:false,function:"deployed",tokenConfigured:true,chatIdConfigured:true,botApi:true,chatAccessible:false,
