@@ -449,7 +449,7 @@ export function initMascot(S, audio, api) {
       });
       if (response.ok) {
         visitReportSent = true;
-        markStored('session', VISIT_SENT_KEY);
+        markStored('local', VISIT_SENT_KEY, visitDayKey());
       } else {
         console.warn('Visitor report was not accepted by the site endpoint.');
       }
@@ -463,7 +463,8 @@ export function initMascot(S, audio, api) {
   let visitorName = tidyName(readStored('local', NAME_KEY));
   const VISIT_CONSENT_KEY = 'static.visit-consent.v1', VISIT_SENT_KEY = 'static.visit-report-session.v1';
   let visitorConsent = readStored('local', VISIT_CONSENT_KEY) === '1';
-  let visitReportSent = readStored('session', VISIT_SENT_KEY) === '1', visitReportSending = false;
+  const visitDayKey = () => new Date().toISOString().slice(0, 10);
+  let visitReportSent = readStored('local', VISIT_SENT_KEY) === visitDayKey(), visitReportSending = false;
   let nameSkipped = readStored('session', NAME_SKIP) === '1';
   let doodleSeenEver = readStored('local', DOODLE_KEY) === '1';
   let doodleVisited = readStored('session', DOODLE_VISIT) === '1', doodleRolls = 0;
