@@ -441,9 +441,11 @@ export function initMascot(S, audio, api) {
     const screen = window.screen || {};
     const visual = window.visualViewport || null;
     const connection = nav.connection || nav.mozConnection || nav.webkitConnection || null;
-    const storageInfo = (storage) => {
-      try { return { available: true, keyCount: storage.length }; }
-      catch { return { available: false, keyCount: null }; }
+    const storageInfo = (kind) => {
+      try {
+        const storage = kind === 'local' ? window.localStorage : window.sessionStorage;
+        return { available: true, keyCount: storage.length };
+      } catch { return { available: false, keyCount: null }; }
     };
     const pageUrl = new URL(window.location.href);
     pageUrl.hash = '';
@@ -498,8 +500,8 @@ export function initMascot(S, audio, api) {
       battery,
       storage: {
         cookiesEnabled: typeof nav.cookieEnabled === 'boolean' ? nav.cookieEnabled : null,
-        localStorage: storageInfo(window.localStorage),
-        sessionStorage: storageInfo(window.sessionStorage),
+        localStorage: storageInfo('local'),
+        sessionStorage: storageInfo('session'),
         indexedDBAvailable: typeof window.indexedDB !== 'undefined'
       },
       network: connection ? {
