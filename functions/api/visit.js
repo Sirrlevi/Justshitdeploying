@@ -33,7 +33,9 @@ async function telegramCall(token,method,body) {
   const result=await response.json().catch(()=>({}));
   return {response,result};
 }
-export async function onRequestGet({env}) {
+export async function onRequestGet({request,env}) {
+  const ip=request.headers.get("CF-Connecting-IP")||"";
+  if(rateLimited(ip,Date.now())) return json({ok:false,stage:"rate_limited"},429);
   const {token,chatId}=envCredentials(env);
   if(!token||!chatId) return json({ok:false,function:"deployed",tokenConfigured:!!token,chatIdConfigured:!!chatId,stage:"cloudflare_secrets"});
   try {
