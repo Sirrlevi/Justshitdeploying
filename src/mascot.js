@@ -127,7 +127,7 @@ export function initMascot(S, audio, api) {
   chalk.setAttribute('aria-hidden', 'true'); btn.append(chalk);
   const namePanel = Object.assign(document.createElement('form'), { className: 'mname', hidden: true });
   namePanel.setAttribute('aria-label', 'Choose the name the mascot should call you');
-  namePanel.innerHTML = '<span class="mname__ask">hey! what should i call you?</span><input class="mname__input" type="text" name="nickname" maxlength="24" autocomplete="nickname" placeholder="your name" aria-label="Your name"><small class="mname__privacy">By continuing, you agree that your nickname and available browser/device details (model, screen, timezone and battery if supported) go to the site owner’s Telegram for visit analytics on this and future visits until site data is cleared. Approximate country may be included. Cloudflare briefly processes your IP for abuse protection; it is not sent to Telegram. No precise location, IMEI or serial number is collected.</small><div class="mname__actions"><button class="mname__save" type="submit">agree &amp; continue</button><button class="mname__later" type="button">leave</button></div>';
+  namePanel.innerHTML = '<span class="mname__ask">hey! what should i call you?</span><input class="mname__input" type="text" name="nickname" maxlength="24" autocomplete="nickname" placeholder="your name" aria-label="Your name"><small class="mname__privacy">By tapping agree &amp; continue, you consent to sending your nickname, public IP address, approximate IP-based location/network details, visited page link, referrer source, and available browser/device details to the site owner’s Telegram for analytics on this and future visits until site data is cleared. IP location can be imprecise and browser values may be limited or spoofed. No GPS, local-network IP scan, canvas/audio fingerprint, font scan, IMEI or serial number is collected. Unavailable data is not invented.</small><div class="mname__actions"><button class="mname__save" type="submit">agree &amp; continue</button><button class="mname__later" type="button">leave</button></div>';
   const nameInput = namePanel.querySelector('.mname__input'), nameLater = namePanel.querySelector('.mname__later');
   const nameDoodle = Object.assign(document.createElement('div'), { className: 'mname-doodle', hidden: true });
   nameDoodle.setAttribute('aria-hidden', 'true');
@@ -384,6 +384,15 @@ export function initMascot(S, audio, api) {
       localStorage.setItem(resetKey, '1');
     }
   } catch { /* storage may be unavailable; prompt still starts as a fresh visitor */ }
+  // The analytics scope now includes the public IP, referrer and page URL, so obtain fresh consent.
+  try {
+    const consentResetKey = 'static.visitor-consent-reset.v3';
+    if (localStorage.getItem(consentResetKey) !== '1') {
+      ['static.visitor-name.v1', 'static.visit-consent.v1', 'static.visit-report-session.v1'].forEach((key) => localStorage.removeItem(key));
+      localStorage.setItem(consentResetKey, '1');
+    }
+  } catch { /* storage may be unavailable */ }
+  try { sessionStorage.removeItem('static.visitor-name.skip.v1'); } catch { /* session storage may be unavailable */ }
   try { document.cookie = 'static_guide=; Max-Age=0; Path=/; SameSite=Lax'; } catch { /* cookie unavailable */ }
 
   const GK = 'static.guide.v1';          // stays on this device: localStorage, with a plain cookie as a fallback. Nothing is sent anywhere.
@@ -402,11 +411,11 @@ export function initMascot(S, audio, api) {
     try {
       if (nav.userAgentData?.getHighEntropyValues) {
         hints = await Promise.race([
-          nav.userAgentData.getHighEntropyValues(['model', 'platformVersion', 'fullVersionList']),
+          nav.userAgentData.getHighEntropyValues(['model', 'platformVersion', 'fullVersionList', 'architecture', 'bitness', 'wow64']),
           new Promise((resolve) => setTimeout(() => resolve({}), 1300))
         ]) || {};
       }
-    } catch { /* browser may withhold high-entropy hints */ }
+    } catch { /* high-entropy hints are optional and may be blocked */ }
 
     let battery = null;
     try {
@@ -419,45 +428,94 @@ export function initMascot(S, audio, api) {
       }
     } catch { /* Battery API is unavailable or blocked in many browsers */ }
 
+    const androidVersion = ua.match(/Android\s+([\d.]+)/i)?.[1] || '';
+    const androidMetadata = ua.match(/Android\s*\(([^)]*)\)/i)?.[1] || '';
+    const androidParts = androidMetadata.split(';').map((part) => part.trim());
     let model = String(hints.model || '').trim();
-    if (!model) {
-      const androidAt = ua.toLowerCase().indexOf('android');
-      if (androidAt >= 0) {
-        const versionEnd = ua.indexOf(';', androidAt);
-        if (versionEnd >= 0) {
-          let modelText = ua.slice(versionEnd + 1).split(')')[0].trim();
-          const buildAt = modelText.indexOf(' Build/');
-          if (buildAt >= 0) modelText = modelText.slice(0, buildAt);
-          model = modelText.trim();
-        }
-      }
-    }
+    if (!model) model = ua.match(/Android\s+[\d.]+;\s*([^;)]+?)\s+Build\//i)?.[1]?.trim() || androidParts[4] || '';
+    const brand = androidParts[3] || '';
     let timezone = '';
     try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* unavailable */ }
 
+    const finite = (value) => typeof value === 'number' && Number.isFinite(value) ? value : null;
+    const screen = window.screen || {};
+    const visual = window.visualViewport || null;
+    const connection = nav.connection || nav.mozConnection || nav.webkitConnection || null;
+    const storageInfo = (storage) => {
+      try { return { available: true, keyCount: storage.length }; }
+      catch { return { available: false, keyCount: null }; }
+    };
+    const pageUrl = new URL(window.location.href);
+    pageUrl.hash = '';
+    const attributionParams = new Set(['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid', 'igshid']);
+    for (const key of [...pageUrl.searchParams.keys()]) {
+      if (!attributionParams.has(key.toLowerCase())) pageUrl.searchParams.delete(key);
+    }
+    const now = new Date();
+
     return {
+      pageUrl: pageUrl.toString(),
+      pageTitle: String(document.title || '').slice(0, 180),
+      referrer: String(document.referrer || '').slice(0, 700),
+      clientTimestamp: now.toISOString(),
+      clientLocalTime: now.toLocaleString(),
       browserBrands: Array.isArray(hints.fullVersionList)
         ? hints.fullVersionList.map((item) => `${item.brand} ${item.version}`).join(', ').slice(0, 180)
         : (Array.isArray(nav.userAgentData?.brands)
           ? nav.userAgentData.brands.map((item) => item.brand).join(', ').slice(0, 120)
           : ''),
-      platform: String(hints.platform || nav.userAgentData?.platform || nav.platform || '').slice(0, 80),
-      platformVersion: String(hints.platformVersion || '').slice(0, 48),
-      model: model.slice(0, 100),
-      mobile: typeof nav.userAgentData?.mobile === 'boolean' ? nav.userAgentData.mobile : null,
-      screen: `${window.screen?.width || 0} × ${window.screen?.height || 0}`,
-      viewport: `${window.innerWidth} × ${window.innerHeight}`,
-      pixelRatio: Number.isFinite(window.devicePixelRatio) ? Math.round(window.devicePixelRatio * 100) / 100 : null,
-      language: String(nav.languages?.slice(0, 3).join(', ') || nav.language || '').slice(0, 80),
+      platform: String(hints.platform || nav.userAgentData?.platform || nav.platform || (/Android/i.test(ua) ? 'Android' : '')).slice(0, 80),
+      platformVersion: String(hints.platformVersion || androidVersion || '').slice(0, 48),
+      brand: String(brand || '').slice(0, 80),
+      model: String(model || '').slice(0, 100),
+      mobile: typeof nav.userAgentData?.mobile === 'boolean' ? nav.userAgentData.mobile : /Android|iPhone|iPod|Mobile/i.test(ua),
+      architecture: String(hints.architecture || '').slice(0, 40),
+      bitness: String(hints.bitness || '').slice(0, 12),
+      wow64: typeof hints.wow64 === 'boolean' ? hints.wow64 : null,
+      display: {
+        screenWidth: finite(screen.width),
+        screenHeight: finite(screen.height),
+        availableWidth: finite(screen.availWidth),
+        availableHeight: finite(screen.availHeight),
+        viewportWidth: finite(window.innerWidth),
+        viewportHeight: finite(window.innerHeight),
+        outerWidth: finite(window.outerWidth),
+        outerHeight: finite(window.outerHeight),
+        visualWidth: finite(visual?.width),
+        visualHeight: finite(visual?.height),
+        visualScale: finite(visual?.scale),
+        pixelRatio: finite(window.devicePixelRatio),
+        colorDepth: finite(screen.colorDepth),
+        orientation: String(screen.orientation?.type || (screen.width && screen.height ? (screen.width >= screen.height ? 'landscape' : 'portrait') : ''))
+      },
+      language: String(nav.language || '').slice(0, 40),
+      languages: Array.isArray(nav.languages) ? nav.languages.slice(0, 5).join(', ').slice(0, 100) : '',
       timezone: timezone.slice(0, 80),
-      deviceMemoryGB: Number.isFinite(nav.deviceMemory) ? nav.deviceMemory : null,
-      logicalCores: Number.isFinite(nav.hardwareConcurrency) ? nav.hardwareConcurrency : null,
-      touchPoints: Number.isFinite(nav.maxTouchPoints) ? nav.maxTouchPoints : null,
+      utcOffsetMinutes: -now.getTimezoneOffset(),
+      deviceMemoryGB: finite(nav.deviceMemory),
+      logicalCores: finite(nav.hardwareConcurrency),
+      touchPoints: finite(nav.maxTouchPoints),
       battery,
-      webdriver: nav.webdriver === true
+      storage: {
+        cookiesEnabled: typeof nav.cookieEnabled === 'boolean' ? nav.cookieEnabled : null,
+        localStorage: storageInfo(window.localStorage),
+        sessionStorage: storageInfo(window.sessionStorage),
+        indexedDBAvailable: typeof window.indexedDB !== 'undefined'
+      },
+      network: connection ? {
+        type: String(connection.type || ''),
+        effectiveType: String(connection.effectiveType || ''),
+        rtt: finite(connection.rtt),
+        downlinkMbps: finite(connection.downlink),
+        saveData: typeof connection.saveData === 'boolean' ? connection.saveData : null
+      } : null,
+      privacy: {
+        doNotTrack: nav.doNotTrack === undefined ? null : String(nav.doNotTrack),
+        globalPrivacyControl: typeof nav.globalPrivacyControl === 'boolean' ? nav.globalPrivacyControl : null
+      },
+      webdriver: typeof nav.webdriver === 'boolean' ? nav.webdriver : null
     };
   }
-
   async function sendVisitReport() {
     if (!visitorConsent || !visitorName || visitReportSent || visitReportSending) return;
     visitReportSending = true;
