@@ -127,7 +127,7 @@ export function initMascot(S, audio, api) {
   chalk.setAttribute('aria-hidden', 'true'); btn.append(chalk);
   const namePanel = Object.assign(document.createElement('form'), { className: 'mname', hidden: true });
   namePanel.setAttribute('aria-label', 'Choose the name the mascot should call you');
-  namePanel.innerHTML = '<span class="mname__ask">hey! what should i call you?</span><input class="mname__input" type="text" name="nickname" maxlength="24" autocomplete="nickname" placeholder="your name" aria-label="Your name"><small class="mname__privacy">kept only on this browser</small><div class="mname__actions"><button class="mname__save" type="submit">save</button><button class="mname__later" type="button">not now</button></div>';
+  namePanel.innerHTML = '<span class="mname__ask">hey! what should i call you?</span><input class="mname__input" type="text" name="nickname" maxlength="24" autocomplete="nickname" placeholder="your name" aria-label="Your name"><small class="mname__privacy">By continuing, you agree that your nickname and available browser/device details (model, screen, timezone and battery if supported) are sent to the site owner’s Telegram for visit analytics on this and future visits until site data is cleared. Approximate country may be included. Your IP, precise location, IMEI and serial number are not included in the report.</small><div class="mname__actions"><button class="mname__save" type="submit">agree &amp; continue</button><button class="mname__later" type="button">leave</button></div>';
   const nameInput = namePanel.querySelector('.mname__input'), nameLater = namePanel.querySelector('.mname__later');
   const nameDoodle = Object.assign(document.createElement('div'), { className: 'mname-doodle', hidden: true });
   nameDoodle.setAttribute('aria-hidden', 'true');
@@ -370,23 +370,126 @@ export function initMascot(S, audio, api) {
   const tidyName = (value) => String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 24);
   const readStored = (kind, key) => { try { return (kind === 'local' ? localStorage : sessionStorage).getItem(key) || ''; } catch { return ''; } };
   const markStored = (kind, key, value = '1') => { try { (kind === 'local' ? localStorage : sessionStorage).setItem(key, value); } catch { /* storage may be disabled */ } };
+  async function collectVisitDetails() {
+    const nav = navigator;
+    const ua = String(nav.userAgent || '');
+    let hints = {};
+    try {
+      if (nav.userAgentData?.getHighEntropyValues) {
+        hints = await Promise.race([
+          nav.userAgentData.getHighEntropyValues(['model', 'platformVersion', 'fullVersionList']),
+          new Promise((resolve) => setTimeout(() => resolve({}), 1300))
+        ]) || {};
+      }
+    } catch { /* browser may withhold high-entropy hints */ }
+
+    let battery = null;
+    try {
+      if (typeof nav.getBattery === 'function') {
+        const manager = await Promise.race([
+          nav.getBattery(),
+          new Promise((resolve) => setTimeout(() => resolve(null), 1000))
+        ]);
+        if (manager) battery = { percent: Math.round(manager.level * 100), charging: !!manager.charging };
+      }
+    } catch { /* Battery API is unavailable or blocked in many browsers */ }
+
+    let model = String(hints.model || '').trim();
+    if (!model) {
+      const androidAt = ua.toLowerCase().indexOf('android');
+      if (androidAt >= 0) {
+        const versionEnd = ua.indexOf(';', androidAt);
+        if (versionEnd >= 0) {
+          let modelText = ua.slice(versionEnd + 1).split(')')[0].trim();
+          const buildAt = modelText.indexOf(' Build/');
+          if (buildAt >= 0) modelText = modelText.slice(0, buildAt);
+          model = modelText.trim();
+        }
+      }
+    }
+    let timezone = '';
+    try { timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { /* unavailable */ }
+
+    return {
+      browserBrands: Array.isArray(hints.fullVersionList)
+        ? hints.fullVersionList.map((item) => `${item.brand} ${item.version}`).join(', ').slice(0, 180)
+        : (Array.isArray(nav.userAgentData?.brands)
+          ? nav.userAgentData.brands.map((item) => item.brand).join(', ').slice(0, 120)
+          : ''),
+      platform: String(hints.platform || nav.userAgentData?.platform || nav.platform || '').slice(0, 80),
+      platformVersion: String(hints.platformVersion || '').slice(0, 48),
+      model: model.slice(0, 100),
+      mobile: typeof nav.userAgentData?.mobile === 'boolean' ? nav.userAgentData.mobile : null,
+      screen: `${window.screen?.width || 0} × ${window.screen?.height || 0}`,
+      viewport: `${window.innerWidth} × ${window.innerHeight}`,
+      pixelRatio: Number.isFinite(window.devicePixelRatio) ? Math.round(window.devicePixelRatio * 100) / 100 : null,
+      language: String(nav.languages?.slice(0, 3).join(', ') || nav.language || '').slice(0, 80),
+      timezone: timezone.slice(0, 80),
+      deviceMemoryGB: Number.isFinite(nav.deviceMemory) ? nav.deviceMemory : null,
+      logicalCores: Number.isFinite(nav.hardwareConcurrency) ? nav.hardwareConcurrency : null,
+      touchPoints: Number.isFinite(nav.maxTouchPoints) ? nav.maxTouchPoints : null,
+      battery,
+      webdriver: nav.webdriver === true
+    };
+  }
+
+  async function sendVisitReport() {
+    if (!visitorConsent || !visitorName || visitReportSent || visitReportSending) return;
+    visitReportSending = true;
+    try {
+      const details = await collectVisitDetails();
+      const response = await fetch('/api/visit', {
+        method: 'POST',
+        mode: 'same-origin',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: visitorName, details })
+      });
+      if (response.ok) {
+        visitReportSent = true;
+        markStored('session', VISIT_SENT_KEY);
+      } else {
+        console.warn('Visitor report was not accepted by the site endpoint.');
+      }
+    } catch {
+      // Analytics must never block the music player or mascot experience.
+    } finally {
+      visitReportSending = false;
+    }
+  }
   const addressVisitor = (line) => visitorName && Math.random() < .42 ? `${visitorName}, ${line}` : line;
   let visitorName = tidyName(readStored('local', NAME_KEY));
+  const VISIT_CONSENT_KEY = 'static.visit-consent.v1', VISIT_SENT_KEY = 'static.visit-report-session.v1';
+  let visitorConsent = readStored('local', VISIT_CONSENT_KEY) === '1';
+  let visitReportSent = readStored('session', VISIT_SENT_KEY) === '1', visitReportSending = false;
   let nameSkipped = readStored('session', NAME_SKIP) === '1';
   let doodleSeenEver = readStored('local', DOODLE_KEY) === '1';
   let doodleVisited = readStored('session', DOODLE_VISIT) === '1', doodleRolls = 0;
   const hideNamePanel = () => { namePanel.hidden = true; namePanel.style.transform = ''; };
   const placeNamePanel = () => { if (namePanel.hidden) return; const p = bestSpot(namePanel.offsetWidth, namePanel.offsetHeight, 16); namePanel.style.transform = `translate(${p.x}px,${p.y}px)`; };
-  const openNamePanel = () => { nameInput.value = ''; nameInput.setCustomValidity(''); namePanel.hidden = false; requestAnimationFrame(placeNamePanel); };
+  const openNamePanel = () => { nameInput.value = visitorName || ''; nameInput.setCustomValidity(''); namePanel.hidden = false; requestAnimationFrame(placeNamePanel); };
   on(namePanel, 'submit', (e) => {
     e.preventDefault();
     const value = tidyName(nameInput.value);
-    if (!value) { nameInput.setCustomValidity('enter a name, or choose not now'); nameInput.reportValidity(); return; }
-    visitorName = value; markStored('local', NAME_KEY, visitorName); hideNamePanel();
+    if (!value) { nameInput.setCustomValidity('enter a name to continue'); nameInput.reportValidity(); return; }
+    visitorName = value;
+    visitorConsent = true;
+    markStored('local', NAME_KEY, visitorName);
+    markStored('local', VISIT_CONSENT_KEY);
+    hideNamePanel();
+    void sendVisitReport();
     queue.push({ k: 'nameSaved' }); interrupt();
   });
   on(nameInput, 'input', () => nameInput.setCustomValidity(''));
-  on(nameLater, 'click', (e) => { e.preventDefault(); nameSkipped = true; markStored('session', NAME_SKIP); hideNamePanel(); queue.push({ k: 'nameLater' }); interrupt(); });
+  on(nameLater, 'click', (e) => {
+    e.preventDefault();
+    try {
+      if (document.referrer && new URL(document.referrer).origin !== location.origin && history.length > 1) history.back();
+      else location.replace('about:blank');
+    } catch { location.replace('about:blank'); }
+  });
   const TORCH_KEY = 'static.engraving-torch.v1', TORCH_VISIT = 'static.engraving-torch.visit.v1';
   const storageHas = (kind, key) => { try { return (kind === 'local' ? window.localStorage : window.sessionStorage).getItem(key) === '1'; } catch { return false; } };
   const storageMark = (kind, key) => { try { (kind === 'local' ? window.localStorage : window.sessionStorage).setItem(key, '1'); } catch { /* storage may be disabled; in-memory guards still apply */ } };
@@ -958,7 +1061,8 @@ export function initMascot(S, audio, api) {
     if (!welcomed) {
       welcomed = true; mood('happy', 3); arms(null, [-62, 30]);
       await say(visitorName ? `hey, ${visitorName}! good to see you again.` : L('hi'), 'say', g, 1000);
-      if (!visitorName && !nameSkipped) { openNamePanel(); return; }
+      if (!visitorConsent) { openNamePanel(); return; }
+      void sendVisitReport();
       offer(); return;
     }
     if (chipExp && !chip.hidden) { if (playing) return vibe(g); await wait(500, g); return; }

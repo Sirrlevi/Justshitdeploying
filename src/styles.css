@@ -394,7 +394,7 @@ a{color:inherit}
 .mname__ask{font-size:13px;font-style:italic;letter-spacing:.01em}
 .mname__input{box-sizing:border-box;width:100%;min-width:0;height:37px;padding:0 10px;border:1px solid rgba(83,59,35,.28);border-radius:9px;outline:none;background:rgba(255,255,255,.56);color:#26190f;font:500 14px "Lora",Georgia,serif}
 .mname__input::placeholder{color:#97866e}
-.mname__privacy{font:10px/1.2 system-ui,sans-serif;color:#88775e;letter-spacing:.02em}
+.mname__privacy{font:9px/1.36 system-ui,sans-serif;color:#806e54;letter-spacing:.005em}
 .mname__input:focus{border-color:#b58d55;box-shadow:0 0 0 2px rgba(181,141,85,.16)}
 .mname__actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .mname__actions button{min-height:32px;padding:5px 13px;border:0;border-radius:999px;font:600 12px system-ui,sans-serif}
