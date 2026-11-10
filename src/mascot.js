@@ -361,6 +361,31 @@ export function initMascot(S, audio, api) {
   const hideChip = () => { chip.hidden = true; chipExp = 0; chipPinned = false; chip.classList.remove('docked'); chip.style.transform = ''; };
   const placeChip = () => { if (chip.hidden || chipPinned) return; const p = bestSpot(chip.offsetWidth, chip.offsetHeight, 10); chipP = { x: M.x, y: M.y }; chip.style.transform = `translate(${p.x}px,${p.y}px)`; };
   const setChip = (text, btns, ms = 0) => { chip.hidden = false; chip.textContent = ''; const s = document.createElement('span'); s.textContent = text; chip.append(s); btns.forEach(([t, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = (e) => { e.stopPropagation(); f(); }; chip.append(b); }); chipExp = ms ? performance.now() + ms : 0; placeChip(); };
+  // One-time reset: existing browsers receive the fresh visitor prompt on their next load.
+  // Player settings (volume and playback preference) are deliberately preserved.
+  try {
+    const resetKey = 'static.visitor-reset.v2';
+    if (localStorage.getItem(resetKey) !== '1') {
+      [
+        'static.visitor-name.v1',
+        'static.visitor-name.skip.v1',
+        'static.visit-consent.v1',
+        'static.visit-report-session.v1',
+        'static.visitor-doodle.v1',
+        'static.engraving-torch.v1',
+        'static.guide.v1',
+        'static.guide'
+      ].forEach((key) => localStorage.removeItem(key));
+      [
+        'static.visitor-name.skip.v1',
+        'static.visitor-doodle.visit.v1',
+        'static.engraving-torch.visit.v1'
+      ].forEach((key) => sessionStorage.removeItem(key));
+      localStorage.setItem(resetKey, '1');
+    }
+  } catch { /* storage may be unavailable; prompt still starts as a fresh visitor */ }
+  try { document.cookie = 'static_guide=; Max-Age=0; Path=/; SameSite=Lax'; } catch { /* cookie unavailable */ }
+
   const GK = 'static.guide.v1';          // stays on this device: localStorage, with a plain cookie as a fallback. Nothing is sent anywhere.
   const gget = () => { try { const v = JSON.parse(localStorage.getItem(GK)); if (v) return v; if (localStorage.getItem('static.guide') === '1') return { s: 'accepted', asked: 1 }; } catch { /* blocked */ } try { const c = document.cookie.match(/(?:^|; )static_guide=([^;]+)/); if (c) return JSON.parse(decodeURIComponent(c[1])); } catch { /* none */ } return null; };
   const gset = (v) => { const s = JSON.stringify(v); try { localStorage.setItem(GK, s); } catch { /* blocked */ } try { document.cookie = `static_guide=${encodeURIComponent(s)};max-age=31536000;path=/;SameSite=Lax`; } catch { /* blocked */ } };
@@ -447,13 +472,18 @@ export function initMascot(S, audio, api) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: visitorName, details })
       });
-      if (response.ok) {
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.ok) {
         visitReportSent = true;
         markStored('local', VISIT_SENT_KEY, visitDayKey());
+        window.__visitReportStatus = { ok: true, date: visitDayKey() };
       } else {
-        console.warn('Visitor report was not accepted by the site endpoint.');
+        window.__visitReportStatus = { ok: false, status: response.status, code: result.code || result.error || 'request_failed', detail: result.detail || '' };
+        console.warn('Visitor report failed:', window.__visitReportStatus);
       }
-    } catch {
+    } catch (error) {
+      window.__visitReportStatus = { ok: false, code: 'network_error' };
+      console.warn('Visitor report network error:', error?.message || 'unknown');
       // Analytics must never block the music player or mascot experience.
     } finally {
       visitReportSending = false;
