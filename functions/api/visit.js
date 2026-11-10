@@ -83,8 +83,9 @@ function browserName(ua) {
   const firefox=ua.match(/(?:Firefox|FxiOS)\/([\d.]+)/i)?.[1];
   const samsung=ua.match(/SamsungBrowser\/([\d.]+)/i)?.[1];
   const safari=ua.match(/Version\/([\d.]+).*Safari/i)?.[1];
-  const engine= edge ? "Edge "+edge : samsung ? "Samsung Internet "+samsung :
-    firefox ? "Firefox "+firefox : chrome ? ((/\bwv\b/i.test(ua)||/; wv\)/i.test(ua)) ? "Chrome WebView "+chrome : "Chrome/Chromium "+chrome :
+  const isWebView=/\bwv\b/i.test(ua)||/; wv\)/i.test(ua);
+  const engine=edge ? "Edge "+edge : samsung ? "Samsung Internet "+samsung :
+    firefox ? "Firefox "+firefox : chrome ? (isWebView ? "Chrome WebView "+chrome : "Chrome/Chromium "+chrome) :
     safari ? "Safari "+safari : "Unavailable";
   return instagram ? "Instagram in-app "+instagram+" · "+engine : engine;
 }
