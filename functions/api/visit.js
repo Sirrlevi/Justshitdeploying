@@ -62,7 +62,7 @@ export async function onRequestPost({request,env}){
     "User-Agent: "+ua,
     "No IP, precise location, IMEI, serial number or persistent device ID is included in this report."
   ];
-  const message=lines.join("\\n").slice(0,3900);
+  const message=lines.join("\n").slice(0,3900);
   const token=env.TELEGRAM_BOT_TOKEN;
   const chatId=env.TELEGRAM_CHAT_ID;
   if(!token||!chatId)return json({ok:false},503);
